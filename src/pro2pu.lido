@@ -1,0 +1,157 @@
+
+/**********/
+
+CHAIN puml_ptg_chn: PTGNode;             /* collect message / enum decls */
+CHAIN puml_fields_ptg_chn: PTGNode;      /* collect fields within decls */
+CHAIN puml_relations_ptg_chn: PTGNode;   /* collect nesting relations */ 
+CHAIN custom_types_env_chn: Environment; /* collect type names */
+
+
+CLASS SYMBOL ROOTCLASS: custom_types: Environment SYNT;
+CLASS SYMBOL ROOTCLASS COMPUTE
+
+  /* start collecting uml lines */
+  CHAINSTART HEAD.puml_ptg_chn = PTGNULL;
+  CHAINSTART HEAD.puml_fields_ptg_chn = PTGNULL;
+  CHAINSTART HEAD.puml_relations_ptg_chn = PTGNULL;
+  /* print collected uml lines */
+  PTGOut(
+    PTGPUML(
+      /* TODO: replace ADD */
+      PTGPackage( CONSTITUENTS Package.name WITH (int,ADD,IDENTICAL,ZERO),
+                  PTGNlSeq(TAIL.puml_ptg_chn, TAIL.puml_relations_ptg_chn)
+      )
+    )
+  );
+
+  /** TODO: collect full qualified path instead of just the name */
+  CHAINSTART HEAD.custom_types_env_chn = NewEnv();
+  SYNT.custom_types = TAIL.custom_types_env_chn;
+END;
+
+CLASS SYMBOL hasName: name: int SYNT;
+
+SYMBOL Package INHERITS hasName END;
+SYMBOL Message INHERITS hasName END;
+SYMBOL Enum    INHERITS hasName END;
+
+
+RULE rPackage: Package ::= PackageName COMPUTE
+  Package.name = PackageName.sym;
+END;
+SYMBOL Package COMPUTE
+  /*SYNT.puml_ptg_chn = PTGPackage(CONSITUTENT PackageName.sym, TAIL.puml_ptg_chn);*/
+
+  /*TODO: handle multiple packages and imports */
+  /*HEAD.puml_relations_ptg_chn = PTGNULL;*/  
+END;
+
+
+RULE rMessage: Message ::= MessageName MessageBody COMPUTE
+  Message.name = MessageName.sym;
+END;
+SYMBOL Message COMPUTE
+  /*printf("DEBUG: looking at message %s\n",StringTable(THIS.name));*/
+  /* pass empty chain down, let subtree fill it  */
+  HEAD.puml_fields_ptg_chn = PTGNULL;
+  /* bridge fields over subtree, in case of nested messages */
+  SYNT.puml_fields_ptg_chn = THIS.puml_fields_ptg_chn;
+
+  SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGClass(THIS.name, TAIL.puml_fields_ptg_chn));
+
+  HEAD.custom_types_env_chn = EnvOf(BindIdn(THIS.custom_types_env_chn,THIS.name));
+END;
+
+RULE rEnum: Enum ::= EnumName EnumBody COMPUTE
+  Enum.name = EnumName.sym;
+END;
+SYMBOL Enum COMPUTE
+/* pass empty chain down, let subtree fill it  */
+  HEAD.puml_fields_ptg_chn = PTGNULL;
+  /* bridge fields over subtree, in case of nested messages */
+  SYNT.puml_fields_ptg_chn = THIS.puml_fields_ptg_chn;
+
+  /* bridge over subtree */
+  SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGEnum(THIS.name, TAIL.puml_fields_ptg_chn));
+
+  HEAD.custom_types_env_chn = EnvOf(BindIdn(THIS.custom_types_env_chn,THIS.name));
+END;
+
+
+SYMBOL Field: field_ptg: PTGNode SYNT;
+SYMBOL Field: field_relation_ptg: PTGNode SYNT; /* is PTGNULL if type is primitve */
+SYMBOL Field COMPUTE
+  /* contribution to chain */
+  SYNT.puml_fields_ptg_chn =
+    PTGNlSeq(THIS.puml_fields_ptg_chn, THIS.field_ptg);
+
+  /* add a type relation of parent uses fieldtype */
+  SYNT.puml_relations_ptg_chn =
+    PTGNlSeq(THIS.puml_relations_ptg_chn, THIS.field_relation_ptg);
+END;
+
+RULE rRequiredField: Field ::= FieldType FieldName FieldId COMPUTE
+  Field.field_ptg = PTGField(FieldName.sym, FieldType.sym, PTGAsIs("required"));
+
+  Field.field_relation_ptg =
+    IF( FieldType.is_custom
+      , PTGRelationUsing(INCLUDING Message.name, FieldType.sym, PTGAsIs("required"))
+      , PTGNULL );
+END;
+
+RULE rOptionalField: Field ::= FieldType FieldName FieldId FieldDefault COMPUTE
+  Field.field_ptg = PTGFieldWithDefault(FieldName.sym, FieldType.sym, PTGAsIs("optional"), FieldDefault.sym);
+  /* TODO: do something with FieldDefault */
+
+  Field.field_relation_ptg =
+    IF( FieldType.is_custom
+      , PTGRelationUsing(INCLUDING Message.name, FieldType.sym, PTGAsIs("optional"))
+      , PTGNULL );
+END;
+
+RULE rRepeatedField: Field ::= FieldType FieldName FieldId COMPUTE
+  Field.field_ptg = PTGField(FieldName.sym, FieldType.sym, PTGAsIs("repeated"));
+
+  Field.field_relation_ptg =
+    IF( FieldType.is_custom
+      , PTGRelationUsing(INCLUDING Message.name, FieldType.sym, PTGAsIs("repeated"))
+      , PTGNULL );
+END;
+
+SYMBOL FieldDefault INHERITS hasSym END;
+RULE rFieldDefault_isEmpty: FieldDefault ::= COMPUTE
+  FieldDefault.sym = 0; /* default to empty sym */
+END;
+RULE rFieldDefault_hasVal: FieldDefault ::= DefaultVal COMPUTE
+  FieldDefault.sym = DefaultVal.sym; 
+END;
+
+RULE rEnumElem: EnumElem ::= EnumKey EnumId COMPUTE
+  EnumElem.puml_fields_ptg_chn =
+    PTGNlSeq(EnumElem.puml_fields_ptg_chn, PTGEnumItem(EnumKey.sym));
+END;
+
+
+CLASS SYMBOL hasSym: sym: int SYNT;
+CLASS SYMBOL hasSym COMPUTE
+  SYNT.sym = TERM;
+END;
+
+SYMBOL PackageName INHERITS hasSym END;
+SYMBOL MessageName INHERITS hasSym END;
+SYMBOL EnumName INHERITS hasSym END;
+SYMBOL FieldName INHERITS hasSym END;
+SYMBOL FieldType INHERITS hasSym END;
+SYMBOL EnumItemName INHERITS hasSym END;
+SYMBOL EnumKey INHERITS hasSym END;
+SYMBOL EnumId INHERITS hasSym END;
+SYMBOL DefaultVal INHERITS hasSym END;
+
+
+
+SYMBOL FieldType: is_custom: Binding SYNT;
+SYMBOL FieldType COMPUTE
+  /** lookup */
+  SYNT.is_custom = BindingInEnv(INCLUDING ROOTCLASS.custom_types, THIS.sym);
+  /*printf("DEBUG: Type %s is custom %d\n",StringTable(THIS.sym), THIS.is_custom);*/
+END;

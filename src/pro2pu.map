@@ -1,0 +1,39 @@
+
+/** **/
+MAPSYM
+
+Package ::= package_stmt .
+Message ::= message_decl2 .
+Enum    ::= enum_decl2 .
+EnumElem ::= enum_elem2 .
+EnumKey ::= enum_key .
+EnumId  ::= enum_id .
+
+PackageName ::= package_name .
+MessageName ::= message_name .
+MessageBody ::= message_body2 .
+EnumName ::= enum_name .
+EnumBody ::= enum_body2 .
+
+Field ::= required_field optional_field repeated_field .
+FieldId ::= field_id .
+FieldType ::= field_type .
+FieldName ::= field_name .
+FieldDefault ::= optional_default . /* TODO: render to something */
+DefaultVal ::= default_val .
+
+MAPRULE
+
+required_field: 'required' field_type field_name '=' field_id ';' <$1$2$3> : rRequiredField.
+optional_field: 'optional' field_type field_name '=' field_id optional_default ';' <$1$2$3$4> : rOptionalField .
+repeated_field: 'repeated' field_type field_name '=' field_id ';' <$1$2$3> : rRepeatedField .
+
+package_stmt: 'package' package_name ';' <$1> : rPackage.
+
+message_decl2: 'message' message_name '{' message_body2 '}' <$1$2> : rMessage .
+enum_decl2: 'enum' enum_name '{' enum_body2 '}' <$1$2> : rEnum.
+
+enum_elem2: enum_key '=' enum_id ';' <$1$2> : rEnumElem .
+
+optional_default:  /* default may be omitted */ <> : rDefaultField_isEmpty .
+optional_default: '[' 'default' '=' default_val ']' <$1> : rDefaultField_hasVal .

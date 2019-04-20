@@ -1,0 +1,20 @@
+/** **/
+Package: "package \"" [PtgOutId $1 int]  "\" {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
+Class: "class " [PtgOutId $1 int] " {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
+Enum: "enum " [PtgOutId $1 int] " {"  [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
+
+/* e.g. {field} +optional type : PhoneType */
+Field: "{field} +" $3 " " [PtgOutId $1 int] " : " [PtgOutId $2 int]
+FieldWithDefault: "{field} +" $3 " " [PtgOutId $1 int] " : " [PtgOutId $2 int] {" (default="} [PtgOutId $4 int] {")"}
+
+/* e.g. MOBILE */
+EnumItem: [PtgOutId $1 int]
+
+/* e.g. AddressBook o-- Person : repeated, formerly: PTGLink */
+RelationUsing: [PtgOutId $1 int] " o-- " [PtgOutId $2 int] " : " $3
+
+/* Newline sequence with optional arguments */
+/*NlSeq: $1 {[BP_Newline]} $2*/
+NlSeq: $1 {[IndentNewLine]} $2
+
+PUML: "@startuml" [IndentNewLine] $ [IndentNewLine] "@enduml" [IndentNewLine]
