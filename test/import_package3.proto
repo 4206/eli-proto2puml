@@ -1,0 +1,8 @@
+syntax = "proto2";
+import public "import_package1.proto";
+
+package import_package3;
+
+message Message3 {
+  required string name3 = 1;
+}

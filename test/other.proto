@@ -1,0 +1,17 @@
+syntax = "proto2";
+
+package other;
+
+message Other {
+  // additional examples from page
+  // https://developers.google.com/protocol-buffers/docs/reference/proto2-spec
+  repeated group Result = 1 {
+    required string url = 2;
+    optional string title = 3;
+    repeated string snippets = 4;
+  }
+  oneof foo {
+    string name = 4;
+    SubMessage sub_message = 9;
+  }
+}

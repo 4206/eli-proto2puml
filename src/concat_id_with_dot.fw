@@ -1,0 +1,38 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+Ensure that a given String is entered into the StringTable.
+Does not enter duplicates into the StringTable.
+
+~O~<concat_id_with_dot.head~>==~{
+#include "concat_id_with_dot.h"
+
+~}
+
+~O~<concat_id_with_dot.h~>==~{
+#ifndef CONCAT_ID_WITH_DOT
+#define CONCAT_ID_WITH_DOT
+
+extern int concat_id_with_dot(int a, int b);
+extern int concat_id(int a, int b);
+
+#endif // CONCAT_ID_WITH_DOT
+
+~}
+
+~O~<concat_id_with_dot.c~>==~{
+#include "concat_id_with_dot.h"
+#include "ensure_idn.h"
+
+int concat_id_with_dot(int a, int b)
+{
+  return concat_idn( ".", a, b );
+}
+
+int concat_id(int a, int b)
+{
+  return concat_idn( "", a, b );
+}
+
+~}

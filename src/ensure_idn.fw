@@ -1,0 +1,90 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+Ensure that a given String is entered into the StringTable.
+Does not enter duplicates into the StringTable.
+
+~O~<ensure_idn.head~>==~{
+#include "ensure_idn.h"
+
+~}
+
+~O~<ensure_idn.h~>==~{
+#ifndef ENSUREIDN_H
+#define ENSUREIDN_H
+
+typedef int StringTableKey;
+
+/** Enter str into the StringTable.
+ *  Unlike mkidn, do not create a new entry,
+ *  if str is already contained.
+ *  Return the first StringTableKey for given str.
+ */
+extern StringTableKey ensure_idn( const char* str );
+
+/** Enter int into the StringTable.
+ *  Behave like ensure_idn, but convert int to string first.
+ */
+extern StringTableKey ensure_int_idn( int i );
+
+/** Concatenate two keys, inserting a single whitespace in between
+ */
+extern StringTableKey concat_idn( const char* sep, StringTableKey a, StringTableKey b );
+extern StringTableKey concat_ws_idn( StringTableKey a, StringTableKey b );
+
+#endif // ENSUREIDN_H
+
+~}
+
+~O~<ensure_idn.c~>==~{
+#include "ensure_idn.h"
+#include <string.h>
+#include "idn.h"
+#include <stdlib.h>
+#include "csm.h" // extern char* StringTable( int i ); csm_obstack
+
+StringTableKey ensure_idn(const char* str)
+{
+  int t,s;
+  mkidn(str,strlen(str),&t,&s);
+  return s;
+}
+
+// allocate space for int according to
+// http://stackoverflow.com/questions/30398185/how-much-space-to-allocate-for-printing-long-int-value-in-string#30398331
+#define STRINGIZER_(exp)   #exp
+#define STRINGIZER(exp)    STRINGIZER_(exp)
+
+StringTableKey ensure_int_idn( int i )
+{
+  const size_t sz = sizeof(STRINGIZER(INT_MAX)); // including terminal 0
+  //char* str = malloc(sz);
+  char *str = (char*) obstack_alloc(&csm_obstack, sz);
+  snprintf(str,sz-1,"%d",i);
+  str[sz] = 0;
+  return ensure_idn(str);
+}
+
+StringTableKey concat_idn( const char* sep, StringTableKey a, StringTableKey b )
+{
+  // avoid concat-ing with empty string
+  if( a == NoIdn ) return b;
+  if( b == NoIdn ) return a;
+
+  const char* ca = StringTable(a);
+  const char* cb = StringTable(b);
+  const int len = strlen(ca)+strlen(cb)+strlen(sep)+1;
+  // char* cab = (char*)malloc(len);
+  char *cab = (char*) obstack_alloc(&csm_obstack, len);
+  snprintf(cab,len,"%s%s%s",ca,sep,cb);
+  cab[len] = 0;
+  return ensure_idn(cab);
+}
+
+StringTableKey concat_ws_idn( StringTableKey a, StringTableKey b )
+{
+  return concat_idn( " ", a, b );
+}
+
+~}

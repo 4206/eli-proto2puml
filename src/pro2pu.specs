@@ -1,5 +1,9 @@
 pro2pu.gla
 pro2pu.con
+$/Input/Include.gnrc:inst
+$/Input/CurrTok.gnrc:inst
+ImportDefer.fw 
+ImportDefer.fw :fwGen/ImportDefer.c  /* select overriding auxEOF */
 
 $/Output/PtgCommon.fw
 pro2pu.ptg
@@ -10,3 +14,6 @@ $/Name/envmod.specs
 $/Output/Indent.fw
 lido_macro.head
 pro2pu.lido
+
+ensure_idn.fw
+concat_id_with_dot.fw

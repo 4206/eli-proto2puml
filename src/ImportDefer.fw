@@ -1,0 +1,171 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+Use import statements to enqueue files for appending at the
+end of the input stream.
+Remembers visited files and does not include them again.
+
+Note: provides an overriding implementation of auxEOF,
+see auxEOF in: http://eli-project.sourceforge.net/elionline/lex_1.html#SEC8
+
+~O~<ImportDefer.head~>==~{
+#include "ImportDefer.h"
+
+~}
+
+~O~<ImportDefer.h~>==~{
+#ifndef IMPORT_DEFER_H
+#define IMPORT_DEFER_H
+
+/** request a filename for including at the bottom of the current input */
+extern void DeferInput(char* filename);
+
+#endif // IMPORT_DEFER_H
+
+~}
+
+~O~<ImportDefer.c~>==~{
+#include "ImportDefer.h"
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include "Include.h"
+#include <unistd.h> // getcwd
+
+#include "source.h"
+#include "csm.h"
+#include "gla.h"
+#include "CoordMap.h"
+#ifdef MONITOR
+#include "dapto.h"
+#include "dapto_dapto.h"
+#endif
+
+//#define PDEBUG(X) X
+#define PDEBUG(X) 
+
+typedef struct ImportRequest {
+  int visited;
+  const char* filename;
+  struct ImportRequest* next;
+} ImportRequest;
+
+/** static field **/
+ImportRequest* import_requests = 0;
+
+void DeferInput(char* filename)
+{
+  PDEBUG(printf("RequestImport(%s)\n", filename));
+
+  // check if queue is initialized
+  if (!import_requests)
+  {
+    PDEBUG(printf("start at %s\n",StringTable(1)));
+    ImportRequest* start = (ImportRequest*)malloc(sizeof(ImportRequest));
+    start->visited = 1;
+    start->filename = StringTable(1);
+    start->next = 0;
+    import_requests = start;
+  }
+  
+  // TODO: check if filename exists
+
+  // trim quotes
+  int len = strlen(filename);
+  if (len < 1) return;  // ignore empty filenames
+
+  char* trimmed;
+  if (filename[0] == '"' && filename[len-1] == '"')
+  { trimmed = (char*)malloc(len-1); // trim by 2, add 1 byte for terminator
+    strncpy(trimmed, filename+1, len-2);
+    trimmed[len-2] = 0;
+  }
+  else
+  { trimmed = filename; }
+
+  // iterate queued names
+  // check if already requested
+  ImportRequest* r = import_requests;
+  for (; r && r->next; r=r->next)
+  { if (0 == strcmp(trimmed, r->filename))
+    { return; }  // skip already requested files
+  }
+
+  // create new struct for storing filename and 'visited' flag
+  ImportRequest* new = (ImportRequest*)malloc(sizeof(ImportRequest));
+  new->visited = 0;
+  new->filename = trimmed;
+  new->next = 0;
+
+  
+  r->next = new;  // append to tail
+
+  PDEBUG(printf("registered '%s' for import\n", trimmed));
+
+  //NextImport();
+}
+
+
+char* NextImport()
+{
+  char cwd[1024]; // limited by os
+  //chdir("/path/to/change/directory/to");
+  getcwd(cwd, sizeof(cwd));
+  PDEBUG(printf("Current working dir: %s\n", cwd));
+
+
+  PDEBUG(printf("loading next import\n"));
+  for (ImportRequest* r=import_requests; r; r=r->next)
+  {
+    PDEBUG(printf("looking at import '%s'...", r->filename));
+    if (r->visited)
+    {
+      PDEBUG(printf("already loaded\n"));
+      continue;
+    }
+    PDEBUG(printf("loading..."));
+    const char* path = r->filename;
+
+    r->visited = 1; // mark as seen
+    return path;
+    //int success = NewInput((char*)path);
+    //printf("%s\n", success ? "ok" : "failed");
+    //break;
+  }
+  // all loaded
+  return 0;
+}
+
+/** override empty default implementation.
+ * Load */
+#if defined(__cplusplus) || defined(__STDC__)
+char *auxEOF(char *start, int length)
+#else
+char *auxEOF(start, length) char *start; int length;
+#endif
+{
+  char* name = NextImport();
+  if (name == 0) return start;
+
+  int descr;
+  descr = open (name, 0);
+  if (descr < 0)
+  {
+    fprintf(stderr, "Failed opening file '%s'\n", name);
+    return start;
+  }
+
+  initBuf(name, descr);
+  AddBreak(name, 1);
+#ifdef MONITOR
+  _dapto_source_changed (name, 1, LineNum, 1, 1, 1);
+#endif
+
+  TokenEnd = TEXTSTART;
+  StartLine = TokenEnd - 1;
+  return TEXTSTART;
+}
+
+~}

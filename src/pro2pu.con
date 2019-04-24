@@ -1,50 +1,154 @@
-/* TODO: extension, oneof, syntax level 3 */
+/* TODO: syntax level 3 */
 
-aaaroot: program.
+aaaroot: programs .
 
-program: proto2 | proto3 | .
+programs: program* .
+
+program: proto2 .
+/*program: proto3 .*/
 
 proto2: syntax_decl2 lang2 .
-proto3: syntax_decl3 lang3 .
+/*proto3: syntax_decl3 lang3 .*/
 
 syntax_decl2: 'syntax' '=' gla_str_proto2 ';' .
-syntax_decl3: 'syntax' '=' gla_str_proto3 ';' .
+/*syntax_decl3: 'syntax' '=' gla_str_proto3 ';' .*/
 
 
 lang2: stmt2* .
 
-stmt2: package_stmt | option_stmt | message_decl2 | enum_decl2 .
+stmt2: import_stmt | package_stmt | option_stmt | message_decl2 | enum_decl2 | emptyStatement .
+
+emptyStatement: ';' .
+
+import_stmt: 'import' ('weak' | 'public') &'DeferInput(GetCurrTok());'  gla_cstring ';' .
 
 package_stmt: 'package' package_name ';' .
-package_name: gla_lower | gla_lower '.' package_name .
+package_name: fullIdent .
 
-option_stmt: 'option' gla_lower '=' gla_cstring ';' .
+option_stmt: 'option' optionName '=' constant ';' .
 
-message_decl2: 'message' message_name '{' message_body2 '}' .
-message_name : gla_upper .
-message_body2: message_elem2* .
-message_elem2: required_field | optional_field | repeated_field | message_decl2 | enum_decl2 .
+message_decl2: 'message' message_name message_body2 .
+message_name : gla_upper | gla_lower .
+message_body2: '{' message_elem2* '}' .
+message_elem2: required_field | optional_field | repeated_field .
+message_elem2: enum_decl2 | message_decl2 . 
+message_elem2: extend2 | extensions2 | group2 | option_elem2 | oneof2 | mapField2 | reserved2 .
+message_elem2: emptyStatement .
 
-enum_decl2: 'enum' enum_name '{' enum_body2 '}' .
-enum_name : gla_upper .
-enum_body2: enum_elem2* .
-enum_elem2: enum_key '=' enum_id ';' .
+enum_decl2: 'enum' enum_name enum_body2 .
+enum_name : gla_upper | gla_lower .
+enum_body2: '{' enum_elem2* '}' .
+enum_elem2: option_elem2 .
+enum_elem2: enum_key '=' enum_id enum_elem2_options ';' .
+
+enum_elem2_options: .
+enum_elem2_options: '[' enumValueOption (',' enumValueOption)* ']' .
+enumValueOption: optionName '=' constant .
+
+option_elem2: 'option' optionName '=' constant ';' .
 
 enum_key: gla_upper .
 enum_id: gla_int .
 
-required_field: 'required' field_type field_name '=' field_id ';' .
-field_type: gla_lower | gla_upper . /* int32 or PhoneType */
-field_name: gla_lower .
-field_id: gla_int .
+required_field: 'required' field_type field_name '=' field_number field_options ';' .
+/*field_type: gla_lower | gla_upper . /* int32 or PhoneType */
+field_type: 'double' | 'float' | 'int32' | 'int64' | 'uint32' | 'uint64'
+      | 'sint32' | 'sint64' | 'fixed32' | 'fixed64' | 'sfixed32' | 'sfixed64'
+      | 'bool' | 'string' | 'bytes' .
+field_type: message_or_enum_type2 .
 
-optional_field: 'optional' field_type field_name '=' field_id optional_default ';' .
-optional_default: . /* default may be omitted */
-optional_default: '[' 'default' '=' default_val ']'.
-default_val: gla_int | gla_lower | gla_upper . /* may be any value of the associated type, including enum elements */
+field_name: gla_lower | gla_upper .
+field_number: gla_int .
 
-repeated_field: 'repeated' field_type field_name '=' field_id ';' .
+optional_field: 'optional' field_type field_name '=' field_number field_options ';' .
+
+repeated_field: 'repeated' field_type field_name '=' field_number field_options ';' .
+
+field_options: . /* may be empty */
+field_options: '[' field_option_kvs ']' .
+field_option_kvs: field_option_kv (',' field_option_kv)* .
+field_option_kv: optionName '=' constant .
+
+extend2: 'extend' message_type2 '{' (field2 | group2 | emptyStatement ) '}' .
+message_type2: gla_upper .
+field2: required_field | optional_field | repeated_field .
+
+group2: label2 'group' group_name2 '=' field_number message_body2 .
+label2: 'required' | 'optional' | 'repeated' .
+group_name2: gla_upper .
+
+
+oneof2: 'oneof' oneofName '{' (oneofField2 | emptyStatement)* '}' .
+oneofName: ident .
+oneofField2: oneofField_type2 field_name '=' field_number field_options ';' .
+oneofField_type2: field_type .
+
+mapField2: 'map' '<' map_key_type2 ',' map_type2 '>' map_name '=' field_number field_options ';' .
+map_key_type2: 'int32' | 'int64' | 'uint32' | 'uint64' | 'sint32' | 'sint64' | 'fixed32' | 'fixed64' | 'sfixed32' | 'sfixed64' | 'bool' | 'string' .
+map_type2: field_type .
+map_name: gla_lower .
+
+extensions2: 'extensions' ranges2 ';' .
+ranges2: range2 (',' range2)* .
+range2: gla_int .
+range2: gla_int 'to' (gla_int | 'max') .
+
+/* CAVEAT: specification is contradictory:
+   https://developers.google.com/protocol-buffers/docs/reference/proto2-spec#reserved
+   spec says: fieldNames = fieldName { "," fieldName }
+   example given is: reserved "foo", "bar";
+*/
+reserved2: 'reserved' (ranges2 | reserved_field_names2) ';' .
+reserved_field_names2: field_name_or_string (',' field_name_or_string)* .
+field_name_or_string:  field_name | gla_cstring .
+
+
+/* spec:
+messageType = [ "." ] { ident "." } messageName
+enumType = [ "." ] { ident "." } enumName
+*/
+
+message_or_enum_type2: dot_or_not (ident '.')* messageName .
+dot_or_not: '.' | .
+messageName: ident .
 
 
 
+/* messageType = [ "." ] { ident "." } messageName */
+/*
+type2: '.'                             gla_lower .
+type2: '.'                             gla_upper .
+type2:                                 gla_lower .
+type2:                                 gla_upper .
+type2: '.'               gla_lower '.' gla_lower .
+type2: '.'               gla_lower '.' gla_upper .
+type2:                   gla_lower '.' gla_lower .
+type2:                   gla_lower '.' gla_upper .
+type2: '.' gla_lower '.' gla_lower '.' gla_lower .
+type2: '.' gla_lower '.' gla_lower '.' gla_upper .
+type2:     gla_lower '.' gla_lower '.' gla_lower .
+type2:     gla_lower '.' gla_lower '.' gla_upper .
+*/
+/*
+message_or_enum_type2: met_begin          messageName .
+message_or_enum_type2: met_begin met_seg* messageName .
+
+met_begin: '.' | .
+met_segs: met_seg .
+met_segs: met_segs met_seg .
+met_seg: ident '.' .
+messageName: ident .
+*/
+
+constant: gla_lower | gla_upper | gla_int | gla_cstring .
+
+optionName: (ident | ('(' fullIdent ')') ) ('.' ident)* .
+
+ident: gla_upper | gla_lower .
+fullIdent: ident              .
+fullIdent: ident fullIdent_tl .
+fullIdent_tl: '.' ident              .
+fullIdent_tl: '.' ident fullIdent_tl .
+
+/*
 lang3: . /* not implemented */

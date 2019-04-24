@@ -1,0 +1,24 @@
+aaaroot: program .
+
+program: proto2 | proto3 | .
+
+proto2: syntax_decl2 proto2_elem* .
+proto3: syntax_decl3 proto3_elem* .
+
+proto2_elem: import | package | option | topLevelDef | emptyStatement .
+topLevelDef: message | enum | extend | service .
+
+// example: import public "other.proto"
+import: 'import' ('weak' | 'public')? strLit ';' .
+
+// example: package foo.bar;
+package: 'package' fullIdent ';' .
+
+// example: option java_package = "com.example.foo"
+option: 'option' optionName '=' constant ';' .
+optionName: ( ident | '(' fullIdent ')' ) ('.' ident)* .
+
+label = 'required' | 'optional' | 'repeated' .
+
+emptyStatement: ';' .
+

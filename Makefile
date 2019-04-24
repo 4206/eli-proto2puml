@@ -11,13 +11,27 @@ parsable:
 	$(ELI) "$(SRC_DIR)/pro2pu.specs :parsable >"
 
 mon:
-	$(ELI) "$(SRC_DIR)/pro2pu.specs +monitor +arg='test/tutorial.proto' :mon"
+	$(ELI) "$(SRC_DIR)/pro2pu.specs +monitor +arg='test/example2.proto' :mon"
 
-test: tutorial.png
+test: tutorial.svg example2.svg
+	# compare with reference outputs
+	for i in $?; do \
+		diff -s $(TRG_DIR)/$$i test/$$i; \
+	done
+test2: example2.puml
+	cat $(TRG_DIR)/$?
+testi: import_package1.puml
+	cat $(TRG_DIR)/$?
 
-%.puml:
-	$(TRG_DIR)/pro2pu test/$(*F).proto > $(TRG_DIR)/$(*F).puml
-%.png:
+%.puml: 
+	# $(TRG_DIR)/pro2pu test/$(*F).proto > $(TRG_DIR)/$(*F).puml
+	cd test; ../$(TRG_DIR)/pro2pu $(*F).proto > ../$(TRG_DIR)/$(*F).puml
+%.png: $(TRG_DIR)/%.puml
 	$(PUML) -tpng $(TRG_DIR)/$(*F).puml
+%.svg: $(TRG_DIR)/%.puml
+	$(PUML) -tsvg $(TRG_DIR)/$(*F).puml
 
 .PHONY: test
+
+connect_to_odin:
+	$(ELI) -r

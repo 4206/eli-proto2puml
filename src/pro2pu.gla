@@ -1,5 +1,10 @@
+/* block and line comments */
+C_COMMENT
+$[/][/] (auxEOL)
+
+/* syntax definition changes the grammar we accept */
 gla_str_proto2: $["]proto2["]
-gla_str_proto3: $["]proto3["] /* TODO: wrap into cstring */
+/*gla_str_proto3: $["]proto3["] /* TODO: wrap into cstring */
 
 
 /* gla_underscore: $[_] [mkidn] /* TODO: warn */
@@ -8,4 +13,3 @@ gla_lower: $[a-z_][A-Za-z_0-9]* [mkidn]
 gla_cstring: C_STRING_LIT
 gla_int: C_INTEGER
 
-C_COMMENT

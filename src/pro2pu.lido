@@ -1,3 +1,11 @@
+/* TODO: syntax level 3 */
+/* TODO: collect groups */
+/* TODO: collect oneof */
+/* TODO: remove package if no package is given */
+/* TODO: clp for include directories */
+
+/* OK: collect type name */
+/* TODO: test type name collection with dotted type names */
 
 /**********/
 
@@ -16,17 +24,37 @@ CLASS SYMBOL ROOTCLASS COMPUTE
   CHAINSTART HEAD.puml_relations_ptg_chn = PTGNULL;
   /* print collected uml lines */
   PTGOut(
-    PTGPUML(
-      /* TODO: replace ADD */
-      PTGPackage( CONSTITUENTS Package.name WITH (int,ADD,IDENTICAL,ZERO),
-                  PTGNlSeq(TAIL.puml_ptg_chn, TAIL.puml_relations_ptg_chn)
-      )
-    )
+    PTGPUML( TAIL.puml_ptg_chn )
   );
 
   /** TODO: collect full qualified path instead of just the name */
   CHAINSTART HEAD.custom_types_env_chn = NewEnv();
   SYNT.custom_types = TAIL.custom_types_env_chn;
+END;
+
+SYMBOL ProtoDoc COMPUTE
+  /* TODO: replace add
+  * can there be multiple packages per file? */
+  SYNT.puml_ptg_chn = /*PTGNlSeq(THIS.puml_ptg_chn,
+                        PTGPackage( CONSTITUENTS Package.name WITH (int,ADD,IDENTICAL,ZERO),
+                                    PTGNlSeq(TAIL.puml_ptg_chn, TAIL.puml_relations_ptg_chn)
+                                  )
+                      );*/
+
+                      PTGNlSeq(THIS.puml_ptg_chn,
+                        /* wrap into package only if there is a package name given */
+                        IF ( CONSTITUENTS Package.name WITH (int,ADD,IDENTICAL,ZERO)
+                           , PTGPackage( CONSTITUENTS Package.name WITH (int,ADD,IDENTICAL,ZERO),
+                                         PTGNlSeq(TAIL.puml_ptg_chn, TAIL.puml_relations_ptg_chn)
+                                       )
+                           , PTGNlSeq(TAIL.puml_ptg_chn, TAIL.puml_relations_ptg_chn)
+                           )
+                      );
+
+
+  HEAD.puml_ptg_chn = PTGNULL;
+  HEAD.puml_fields_ptg_chn = PTGNULL;
+  HEAD.puml_relations_ptg_chn = PTGNULL;
 END;
 
 CLASS SYMBOL hasName: name: int SYNT;
@@ -90,7 +118,7 @@ SYMBOL Field COMPUTE
     PTGNlSeq(THIS.puml_relations_ptg_chn, THIS.field_relation_ptg);
 END;
 
-RULE rRequiredField: Field ::= FieldType FieldName FieldId COMPUTE
+RULE rRequiredField: Field ::= FieldType FieldName FieldNumber FieldOptions COMPUTE
   Field.field_ptg = PTGField(FieldName.sym, FieldType.sym, PTGAsIs("required"));
 
   Field.field_relation_ptg =
@@ -99,8 +127,9 @@ RULE rRequiredField: Field ::= FieldType FieldName FieldId COMPUTE
       , PTGNULL );
 END;
 
-RULE rOptionalField: Field ::= FieldType FieldName FieldId FieldDefault COMPUTE
-  Field.field_ptg = PTGFieldWithDefault(FieldName.sym, FieldType.sym, PTGAsIs("optional"), FieldDefault.sym);
+RULE rOptionalField: Field ::= FieldType FieldName FieldNumber FieldOptions COMPUTE
+  /*Field.field_ptg = PTGFieldWithDefault(FieldName.sym, FieldType.sym, PTGAsIs("optional"), FieldDefault.sym);*/
+Field.field_ptg = PTGField(FieldName.sym, FieldType.sym, PTGAsIs("optional"));
   /* TODO: do something with FieldDefault */
 
   Field.field_relation_ptg =
@@ -109,7 +138,7 @@ RULE rOptionalField: Field ::= FieldType FieldName FieldId FieldDefault COMPUTE
       , PTGNULL );
 END;
 
-RULE rRepeatedField: Field ::= FieldType FieldName FieldId COMPUTE
+RULE rRepeatedField: Field ::= FieldType FieldName FieldNumber FieldOptions COMPUTE
   Field.field_ptg = PTGField(FieldName.sym, FieldType.sym, PTGAsIs("repeated"));
 
   Field.field_relation_ptg =
@@ -118,15 +147,7 @@ RULE rRepeatedField: Field ::= FieldType FieldName FieldId COMPUTE
       , PTGNULL );
 END;
 
-SYMBOL FieldDefault INHERITS hasSym END;
-RULE rFieldDefault_isEmpty: FieldDefault ::= COMPUTE
-  FieldDefault.sym = 0; /* default to empty sym */
-END;
-RULE rFieldDefault_hasVal: FieldDefault ::= DefaultVal COMPUTE
-  FieldDefault.sym = DefaultVal.sym; 
-END;
-
-RULE rEnumElem: EnumElem ::= EnumKey EnumId COMPUTE
+RULE rEnumElem: EnumElem ::= EnumKey EnumId EnumElemOptions COMPUTE
   EnumElem.puml_fields_ptg_chn =
     PTGNlSeq(EnumElem.puml_fields_ptg_chn, PTGEnumItem(EnumKey.sym));
 END;
@@ -137,17 +158,40 @@ CLASS SYMBOL hasSym COMPUTE
   SYNT.sym = TERM;
 END;
 
-SYMBOL PackageName INHERITS hasSym END;
+SYMBOL ident INHERITS hasSym END; /* TODO: rename head */
+
+SYMBOL PackageName INHERITS hasSym COMPUTE
+  SYNT.sym = CONSTITUENTS ident.sym WITH(int,concat_id_with_dot,IDENTICAL,ZERO);
+END;
 SYMBOL MessageName INHERITS hasSym END;
 SYMBOL EnumName INHERITS hasSym END;
 SYMBOL FieldName INHERITS hasSym END;
-SYMBOL FieldType INHERITS hasSym END;
+SYMBOL FieldType INHERITS hasSym COMPUTE /* TODO */ END;
 SYMBOL EnumItemName INHERITS hasSym END;
 SYMBOL EnumKey INHERITS hasSym END;
 SYMBOL EnumId INHERITS hasSym END;
-SYMBOL DefaultVal INHERITS hasSym END;
 
+RULE rFieldType01: FieldType ::= 'double' COMPUTE FieldType.sym = ensure_idn("double"); END;
+RULE rFieldType02: FieldType ::= 'float' COMPUTE FieldType.sym = ensure_idn("float"); END;
+RULE rFieldType03: FieldType ::= 'int32' COMPUTE FieldType.sym = ensure_idn("int32"); END;
+RULE rFieldType04: FieldType ::= 'int64' COMPUTE FieldType.sym = ensure_idn("int64"); END;
+RULE rFieldType05: FieldType ::= 'uint32' COMPUTE FieldType.sym = ensure_idn("uint32"); END;
+RULE rFieldType06: FieldType ::= 'uint64' COMPUTE FieldType.sym = ensure_idn("uint64"); END;
+RULE rFieldType07: FieldType ::= 'sint32' COMPUTE FieldType.sym = ensure_idn("sint32"); END;
+RULE rFieldType08: FieldType ::= 'sint64' COMPUTE FieldType.sym = ensure_idn("sint64"); END;
+RULE rFieldType09: FieldType ::= 'fixed32' COMPUTE FieldType.sym = ensure_idn("fixed32"); END;
+RULE rFieldType10: FieldType ::= 'fixed64' COMPUTE FieldType.sym = ensure_idn("fixed64"); END;
+RULE rFieldType11: FieldType ::= 'sfixed32' COMPUTE FieldType.sym = ensure_idn("sfixed32"); END;
+RULE rFieldType12: FieldType ::= 'sfixed64' COMPUTE FieldType.sym = ensure_idn("sfixed64"); END;
+RULE rFieldType13: FieldType ::= 'bool' COMPUTE FieldType.sym = ensure_idn("bool"); END;
+RULE rFieldType14: FieldType ::= 'string' COMPUTE FieldType.sym = ensure_idn("string"); END;
+RULE rFieldType15: FieldType ::= 'bytes' COMPUTE FieldType.sym = ensure_idn("bytes"); END;
+RULE rFieldType16: FieldType ::= message_or_enum_type2 COMPUTE
+  FieldType.sym =
+    concat_id( CONSTITUENT DotOrNot.sym,
+               CONSTITUENTS ident.sym WITH(int,concat_id_with_dot,IDENTICAL,ZERO) );
 
+END;
 
 SYMBOL FieldType: is_custom: Binding SYNT;
 SYMBOL FieldType COMPUTE
@@ -155,3 +199,7 @@ SYMBOL FieldType COMPUTE
   SYNT.is_custom = BindingInEnv(INCLUDING ROOTCLASS.custom_types, THIS.sym);
   /*printf("DEBUG: Type %s is custom %d\n",StringTable(THIS.sym), THIS.is_custom);*/
 END;
+
+SYMBOL DotOrNot INHERITS hasSym END;
+RULE rDot:    DotOrNot ::= '.' COMPUTE DotOrNot.sym = ensure_idn("."); END;
+RULE rNotDot: DotOrNot ::=     COMPUTE DotOrNot.sym = 0; END;
