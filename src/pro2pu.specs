@@ -3,7 +3,7 @@ pro2pu.con
 $/Input/Include.gnrc:inst
 $/Input/CurrTok.gnrc:inst
 ImportDefer.fw 
-ImportDefer.fw :fwGen/ImportDefer.c  /* select overriding auxEOF */
+ImportDefer.fw :fwGen/ImportDefer.c  /* select preferred auxEOF definition */
 
 $/Output/PtgCommon.fw
 pro2pu.ptg

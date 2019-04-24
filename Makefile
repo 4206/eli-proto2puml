@@ -18,9 +18,11 @@ test: tutorial.svg example2.svg
 	for i in $?; do \
 		diff -s $(TRG_DIR)/$$i test/$$i; \
 	done
+test1: tutorial.puml
+	cat $(TRG_DIR)/$?
 test2: example2.puml
 	cat $(TRG_DIR)/$?
-testi: import_package1.puml
+testimport: import_package1.puml
 	cat $(TRG_DIR)/$?
 
 %.puml: 
