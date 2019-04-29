@@ -1,0 +1,15 @@
+@startuml
+package "wolken" {
+   class wolken.Wolken {
+      {field} +(optional) gruppen_name : string
+      {field} +repeated wolken : wolken.Wolke  // fully qualified 
+   }
+}
+package "wolken" {
+   class wolken.Wolke {
+      {field} +(optional) x : int32
+      {field} +(optional) y : int32
+   }
+}
+wolken.Wolken o-- wolken.Wolke : repeated  // fully qualified
+@enduml

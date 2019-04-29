@@ -1,0 +1,11 @@
+// Wolken.proto
+syntax = "proto3";
+
+package wolken;
+
+import "wolken/Wolke.proto";
+
+message Wolken {
+    string gruppen_name = 1;
+    repeated wolken.Wolke wolken = 2;
+}

@@ -1,7 +1,7 @@
 /** **/
 Package: "package \"" [PtgOutId $1 int]  "\" {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
-Class: "class " [PtgOutId $1 int] " {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
-Enum: "enum " [PtgOutId $1 int] " {"  [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
+Class: "class " $1 " {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
+Enum: "enum " $1 " {"  [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
 
 NoPackage: "package \"\" {" [IndentIncr] [IndentNewLine] $1 [IndentDecr] [IndentNewLine] "}"
 
@@ -18,11 +18,12 @@ MapField: "{field} +" [PtgOutId $1 int] " : map<" [PtgOutId $2 int] ":" [PtgOutI
 EnumItem: [PtgOutId $1 int]
 
 /* e.g. AddressBook o-- Person : repeated, formerly: PTGLink */
-RelationUsing: [PtgOutId $1 int] " o-- " [PtgOutId $2 int] " : " $3
+RelationUsing: $1 " o-- " [PtgOutId $2 int] " : " $3
 
 /* Newline sequence with optional arguments */
-/*NlSeq: $1 {[BP_Newline]} $2*/
 NlSeq: $1 {[IndentNewLine]} $2
+
+DotSeq: $1 {"."} $2
 
 PUML: "@startuml" [IndentNewLine] $ [IndentNewLine] "@enduml" [IndentNewLine]
 

@@ -1,0 +1,9 @@
+///  Wolke.proto
+syntax = "proto3";
+
+package wolken;
+
+message Wolke {
+    int32 x = 1;
+    int32 y = 1;
+}

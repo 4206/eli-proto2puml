@@ -1,3 +1,4 @@
+/* TODO: fully qualify class / type names */
 /* TODO: add note to PUML if there have been errors parsing .proto */
 /* DONE: syntax level 3 */
 /* TODO: collect groups -> ignored */
@@ -22,7 +23,7 @@ CHAIN puml_ptg_chn: PTGNode;             /* collect message / enum decls */
 CHAIN puml_fields_ptg_chn: PTGNode;      /* collect fields within decls */
 CHAIN puml_relations_ptg_chn: PTGNode;   /* collect nesting relations */ 
 CHAIN custom_types_env_chn: Environment; /* collect type names */
-
+CHAIN qualified_classname_chn: PTGNode;      /* pass down segments for qualified pathname */
 
 CLASS SYMBOL ROOTCLASS: custom_types: Environment SYNT;
 CLASS SYMBOL ROOTCLASS COMPUTE
@@ -42,11 +43,11 @@ CLASS SYMBOL ROOTCLASS COMPUTE
   SYNT.custom_types = TAIL.custom_types_env_chn;
 END;
 
-
+SYMBOL ProtoDoc: package_name: int SYNT;
 SYMBOL ProtoDoc COMPUTE
   SYNT.puml_ptg_chn = PTGNlSeq(THIS.puml_ptg_chn,
                       PTGNlSeq(%// wrap into package only if there is a package name given
-                               IF (CONSTITUENTS Package.name WITH (int,ior,IDENTICAL,ZERO)
+                               IF ( THIS.package_name %// is not null
                                   , PTGPackage( CONSTITUENTS Package.name WITH (int,ior_package,IDENTICAL,ZERO)
                                               , TAIL.puml_ptg_chn )
                                   , PTGNoPackage( TAIL.puml_ptg_chn )
@@ -57,6 +58,12 @@ SYMBOL ProtoDoc COMPUTE
   HEAD.puml_ptg_chn = PTGNULL;
   HEAD.puml_fields_ptg_chn = PTGNULL;
   /*HEAD.puml_relations_ptg_chn = PTGNULL;*/ %// propagate all relations through the end
+
+  %// pull up package name to document root
+  SYNT.package_name = CONSTITUENTS Package.name WITH (int,ior_package,IDENTICAL,ZERO);
+
+  %// hand down type qualifier, start with package name
+  CHAINSTART HEAD.qualified_classname_chn = IF( THIS.package_name, PTGId(THIS.package_name), PTGNULL );
 END;
 
 CLASS SYMBOL hasName: name: int SYNT;
@@ -77,6 +84,19 @@ SYMBOL Package COMPUTE
 END;
 
 
+CLASS SYMBOL qualifiedName: qualified_name_ptg: PTGNode SYNT;
+CLASS SYMBOL qualifiedName COMPUTE
+  SYNT.qualified_name_ptg = PTGDotSeq(THIS.qualified_classname_chn, PTGId(THIS.name));
+
+  %// pass down
+  HEAD.qualified_classname_chn = THIS.qualified_name_ptg;
+  SYNT.qualified_classname_chn = THIS.qualified_classname_chn; %// bridge
+END;
+
+SYMBOL Message INHERITS qualifiedName END;
+SYMBOL Enum    INHERITS qualifiedName END;
+/*SYMBOL Extend  INHERITS qualifiedName END; TODO: some Eli error with overrides not recognized? */
+
 RULE rMessage: Message ::= MessageName MessageBody COMPUTE
   /* declares a new type of .name */
   Message.name = MessageName.sym;
@@ -88,10 +108,13 @@ SYMBOL Message COMPUTE
   /* bridge fields over subtree, in case of nested messages */
   SYNT.puml_fields_ptg_chn = THIS.puml_fields_ptg_chn;
 
-  SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGClass(THIS.name, TAIL.puml_fields_ptg_chn));
+  %//SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGClass(THIS.name, TAIL.puml_fields_ptg_chn));
+  SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGClass(THIS.qualified_name_ptg, TAIL.puml_fields_ptg_chn));
 
   HEAD.custom_types_env_chn = EnvOf(BindIdn(THIS.custom_types_env_chn,THIS.name));
+
 END;
+
 
 RULE rEnum: Enum ::= EnumName EnumBody COMPUTE
   Enum.name = EnumName.sym;
@@ -103,9 +126,26 @@ SYMBOL Enum COMPUTE
   SYNT.puml_fields_ptg_chn = THIS.puml_fields_ptg_chn;
 
   /* bridge over subtree */
-  SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGEnum(THIS.name, TAIL.puml_fields_ptg_chn));
+  %//SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGEnum(THIS.name, TAIL.puml_fields_ptg_chn));
+  SYNT.puml_ptg_chn = PTGNlSeq(TAIL.puml_ptg_chn, PTGEnum(THIS.qualified_name_ptg, TAIL.puml_fields_ptg_chn));
 
   HEAD.custom_types_env_chn = EnvOf(BindIdn(THIS.custom_types_env_chn,THIS.name));
+
+  /* refine step for qualified name */
+  HEAD.qualified_classname_chn = PTGDotSeq(THIS.qualified_classname_chn, PTGId(THIS.name));
+  SYNT.qualified_classname_chn = THIS.qualified_classname_chn; %// bridge
+END;
+
+
+SYMBOL Extend: messageType: int SYNT;
+RULE rExtend: Extend ::= MessageType ExtendBody COMPUTE
+  Extend.messageType = MessageType.sym;
+END;
+
+SYMBOL Extend: qualified_name_ptg: PTGNode SYNT;
+SYMBOL Extend COMPUTE
+  /* must override in SYMBOL, not in RULE */
+  SYNT.qualified_name_ptg = PTGDotSeq(THIS.qualified_classname_chn, PTGId(THIS.messageType));
 END;
 
 
@@ -138,7 +178,8 @@ RULE rField: Field ::= Label FieldType FieldName FieldNumber FieldOptions COMPUT
   %// no name analysis carried out; we assume that FieldType.sym is defined
   Field.field_relation_ptg =
     IF( FieldType.is_custom
-      , PTGRelationUsing(INCLUDING (Message.name, Extend.messageType), FieldType.sym, PTGId(Label.sym))
+      /*, PTGRelationUsing(INCLUDING (Message.name, Extend.messageType), FieldType.sym, PTGId(Label.sym))*/
+      , PTGRelationUsing(INCLUDING (Message.qualified_name_ptg, Extend.qualified_name_ptg), FieldType.sym, PTGId(Label.sym))
       , PTGNULL );
 END;
 
@@ -154,7 +195,8 @@ RULE rMap: Map ::= MapKeyType MapValType MapName FieldNumber FieldOptions COMPUT
 
     Map.field_relation_ptg =
       IF( MapValType.is_custom
-        , PTGRelationUsing(INCLUDING (Message.name, Extend.messageType), MapValType.sym, PTGAsIs("map value"))
+        /*, PTGRelationUsing(INCLUDING (Message.name, Extend.messageType), MapValType.sym, PTGAsIs("map value"))*/
+        , PTGRelationUsing(INCLUDING (Message.qualified_name_ptg, Extend.qualified_name_ptg), MapValType.sym, PTGAsIs("map value"))
         , PTGNULL );
 END;
 
@@ -178,7 +220,8 @@ RULE rOneOfField: OneOfField ::= FieldType FieldName FieldNumber FieldOptions CO
   %// oneof variants may be custom types
   OneOfField.field_relation_ptg = 
     IF ( FieldType.is_custom
-       , PTGRelationUsing( INCLUDING (Message.name, Extend.messageType), FieldType.sym, PTGoneofVariant(INCLUDING OneOf.name))
+       /*, PTGRelationUsing( INCLUDING (Message.name, Extend.messageType), FieldType.sym, PTGoneofVariant(INCLUDING OneOf.name))*/
+       , PTGRelationUsing( INCLUDING (Message.qualified_name_ptg, Extend.qualified_name_ptg), FieldType.sym, PTGoneofVariant(INCLUDING OneOf.name))
        , PTGNULL
        );
 END;
@@ -246,12 +289,6 @@ SYMBOL MapValType INHERITS customizableType END;
 SYMBOL DotOrNot INHERITS hasSym END;
 RULE rDot:    DotOrNot ::= '.' COMPUTE DotOrNot.sym = ensure_idn("."); END;
 RULE rNotDot: DotOrNot ::=     COMPUTE DotOrNot.sym = 0; END;
-
-SYMBOL Extend: messageType: int SYNT;
-RULE rExtend: Extend ::= MessageType ExtendBody COMPUTE
-  Extend.messageType = MessageType.sym;
-END;
-
 
 
 RULE rPrimitiveType_int32:    PrimitiveType ::= 'int32'    COMPUTE PrimitiveType.sym=ensure_idn("int32");    END;

@@ -41,6 +41,10 @@ test4a:
 	$(TRG_DIR)/pro2pu -Itest -Itest/test4-module1 -Itest/test4-module2 test/test4a.proto
 test4b:
 	$(TRG_DIR)/pro2pu -Itest test/test4b.proto
+test5:
+	$(TRG_DIR)/pro2pu -Itest test/wolken/Wolken.proto > $(TRG_DIR)/Wolken.puml
+	cat $(TRG_DIR)/Wolken.puml
+	plantuml -tsvg $(TRG_DIR)/Wolken.puml
 
 %.puml: 
 	cd test; ../$(TRG_DIR)/pro2pu $(*F).proto > ../$(TRG_DIR)/$(*F).puml
