@@ -12,8 +12,10 @@ pro2pu.map
 
 $/Name/envmod.specs
 $/Output/Indent.fw
-lido_macro.head
 pro2pu.lido
+ior.fw
 
 ensure_idn.fw
 concat_id_with_dot.fw
+
+pro2pu.clp

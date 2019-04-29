@@ -1,0 +1,43 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+~O~<ior.head~>==~{
+#include "ior.h"
+
+~}
+
+~O~<ior.h~>==~{
+#ifndef IOR_H
+#define IOR_H
+
+extern int ior(int a, int b);
+extern int ior_package(int a, int b);
+
+#endif // IOR_H
+
+~}
+
+~O~<ior.c~>==~{
+#include "ior.h"
+#include <stdio.h>
+#include "csm.h"
+
+int ior(int a, int b)
+{
+  if (a) return a;
+  return b;
+}
+
+int ior_package(int a, int b)
+{
+  if (a && b)
+  { fprintf(stderr, "Using package declaration '%s'\n", StringTable(a)); 
+    fprintf(stderr, "Ignored additional package declaration '%s'\n", StringTable(b));
+    return a;
+  }
+  else
+    return a ? a : b;
+}
+
+~}

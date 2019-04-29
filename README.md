@@ -1,23 +1,40 @@
+# pro2pu - Protobuf to PlantUML converter
+
+A parser for protobuf files and compiler to plantuml files.
+Supports protobuf syntax 2 and 3.
+Generates simple class diagrams which can be converted to images with plantuml.
+
+Importing of files is supported (must be in cwd). Cyclic dependencies are resolved.
+
+## Examples
+
+[tutorial.proto](https://developers.google.com/protocol-buffers/docs/reference/proto2-spec#proto_file) from the protobuf 2 documentation
+
+![tutorial.proto](test/tutorial.svg "tutorial.proto")
+
 ## Prerequisites
 
-Have ```eli``` installed.
-Obtain it from https://eli-project.sf.net and compile.
-In order for debugging with ```make mon``` to work, Tcl/Tk development libraries must be installed prior to building eli.
+The compiler is built with ELI (https://eli-project.sf.net), a compiler generator toolkit.
+ELI must be built from source. If Tcl/Tk development libraries are available during compilation, parser debugging with ```make mon``` will work.
 
-Adjust Makefile if path for eli is not ```/opt/eli/bin/eli```
+Adjust the Makefile, if you install ELI someplace other than ```/opt/eli/```.
 
 ## Building
 
-Run ```make``` to build ```target/pro2pu``` executable.
+Run ```make exe``` to build the ```target/pro2pu``` executable.
 
-## Error handling
+Run ```make source``` to generate C source code for compilation on different OS'es, e.g. MacOS, Windows. Some adjustments may be needed.
 
-Building fails with message ```Cannot connect to Odin server.```
-Then run ```eli -r``` or ```make connect_to_odin```.
+### Errors during build
+
+If building fails with message ```Cannot connect to Odin server.```,
+then run ```eli -r``` or ```make connect_to_odin```.
 
 ## Errors in the specs
 
-The protobuffer specification for syntax level 2 ("proto2") is either incomplete or has wrong examples.
+The parser has been built to spec, however
+the protobuffer specification for syntax levels 2 and 3
+contradicts its own examples in the cases detailed below.
 
 ### Groups
 
@@ -67,6 +84,10 @@ The parser implementation will be lenient wrt. reserved names,
 as they are not used for compiling to PUML.
 
 ## Syntax differences between proto2 and proto3
+
+The parser supports both syntax2 and syntax3, if the ```.proto``` file correctly declares the dialect it is using.
+Here we list the differences in grammar specification between the syntax versions.
+
 
 Productions dropped from proto2 to proto3:
 

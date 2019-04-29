@@ -25,6 +25,11 @@ extern void DeferInput(char* filename);
 
 ~}
 
+~O~<ImportDefer.clp~>==~{
+IncludeDir "-I" "--include=" joinedto strings "Include directory imports";
+/* use CLP_InputFile to access input filename, see: http://eli-project.sourceforge.net/elionline/clp_4.html#SEC21 */
+~}
+
 ~O~<ImportDefer.c~>==~{
 #include "ImportDefer.h"
 
@@ -43,6 +48,10 @@ extern void DeferInput(char* filename);
 #include "dapto_dapto.h"
 #endif
 
+// clp processing
+#include "csm.h"
+#include "clp.h"
+
 //#define PDEBUG(X) X
 #define PDEBUG(X) 
 
@@ -55,20 +64,31 @@ typedef struct ImportRequest {
 /** static field **/
 ImportRequest* import_requests = 0;
 
-void DeferInput(char* filename)
+void init_import_requests()
 {
-  PDEBUG(printf("RequestImport(%s)\n", filename));
-
-  // check if queue is initialized
   if (!import_requests)
   {
     PDEBUG(printf("start at %s\n",StringTable(1)));
     ImportRequest* start = (ImportRequest*)malloc(sizeof(ImportRequest));
     start->visited = 1;
-    start->filename = StringTable(1);
+    start->filename = StringTable(GetClpValue(CLP_InputFile,0)); // note: StringTable(1) does not work with subdirectories!
     start->next = 0;
     import_requests = start;
   }
+}
+
+/** DeferInput collects filenames in the parser
+ * (call '&DeferInput();' within a .con rule.
+ * DeferInput must remember the cwd (current working directory),
+ * from which a filename was requested for input,
+ * because cwd may change when combining multiple input dir (-I)
+ * with relative paths in the import statement */
+void DeferInput(char* filename)
+{
+  PDEBUG(printf("DeferImport(%s)\n", filename));
+
+  // check if queue is initialized
+  init_import_requests();
   
   // TODO: check if filename exists
 
@@ -76,6 +96,7 @@ void DeferInput(char* filename)
   int len = strlen(filename);
   if (len < 1) return;  // ignore empty filenames
 
+  // trim double quote characters around the filename
   char* trimmed;
   if (filename[0] == '"' && filename[len-1] == '"')
   { trimmed = (char*)malloc(len-1); // trim by 2, add 1 byte for terminator
@@ -84,6 +105,11 @@ void DeferInput(char* filename)
   }
   else
   { trimmed = filename; }
+
+  // TODO: store CWD
+  //char cwd[1024]; // limited by os
+  //getcwd(cwd, sizeof(cwd));
+  //PDEBUG(printf("Current working dir: %s\n", cwd));
 
   // iterate queued names
   // check if already requested
@@ -108,7 +134,7 @@ void DeferInput(char* filename)
 }
 
 
-char* NextImport()
+const char* NextImport()
 {
   char cwd[1024]; // limited by os
   //chdir("/path/to/change/directory/to");
@@ -128,6 +154,9 @@ char* NextImport()
     PDEBUG(printf("loading..."));
     const char* path = r->filename;
 
+//TODO: track visited list based on full qualified paths names,
+//in order to avoid multiple imports when using relative paths in import statement.
+
     r->visited = 1; // mark as seen
     return path;
     //int success = NewInput((char*)path);
@@ -138,6 +167,52 @@ char* NextImport()
   return 0;
 }
 
+int try_open(const char *path, int oflags)
+{
+  int descr;
+  descr = open (path, oflags);
+  if (descr >= 0) return descr;
+
+  int path_len = strlen(path);
+
+  char cwd[1024]; // limited by os
+  //chdir("/path/to/change/directory/to");
+  getcwd(cwd, sizeof(cwd));
+  PDEBUG(printf("Current working dir: %s\n", cwd));
+
+
+  // try to open pathname relative to include directories
+  char* pre_path, *full_path;
+  int prefix_len, full_len;
+  for (DefTableKeyList list=IncludeDir; list; list=TailDefTableKeyList(list))
+  {
+    PDEBUG(printf("0\n"));
+    pre_path = StringTable(GetClpValue(HeadDefTableKeyList(list), 0));
+    prefix_len = strlen(pre_path);
+    full_len = prefix_len + path_len + 2;
+    full_path = (char*)malloc(full_len); // add separator and terminator
+    int byteswritten = snprintf(full_path, full_len, "%s/%s", pre_path, path);
+    if (byteswritten + 1 != full_len)
+    { fprintf(stderr, "Failed to allocate path %s/%s\n", pre_path, path);
+      free(full_path);
+      continue;
+    }
+    PDEBUG(printf(">1%s<\n", full_path));
+    descr = open (full_path, oflags);
+    PDEBUG(printf(">2%s<%d\n", full_path, descr));
+    //free(full_path);
+    PDEBUG(printf(">3%s<%d\n", full_path, descr));
+    if (descr >= 0)
+    { PDEBUG(printf("3x\n"));
+     return descr;
+    }
+    PDEBUG(printf("4\n"));
+  }
+  PDEBUG(printf("5\n"));
+  //return 0; // default to stdin
+  return -1;
+}
+
 /** override empty default implementation.
  * Load */
 #if defined(__cplusplus) || defined(__STDC__)
@@ -146,11 +221,11 @@ char *auxEOF(char *start, int length)
 char *auxEOF(start, length) char *start; int length;
 #endif
 {
-  char* name = NextImport();
+  const char* name = NextImport(); // return value 0 signals end-of-queue
   if (name == 0) return start;
 
   int descr;
-  descr = open (name, 0);
+  descr = try_open (name, 0);
   if (descr < 0)
   {
     fprintf(stderr, "Failed opening file '%s'\n", name);
