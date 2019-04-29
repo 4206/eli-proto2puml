@@ -10,6 +10,7 @@ exe:
 source:
 	mkdir -p $(TRG_DIR)/source/
 	$(ELI) "$(SRC_DIR)/pro2pu.specs :source > $(TRG_DIR)/source/"	
+	cd $(TRG_DIR); tar cfz pro2pu-$(shell date +%Y-%m%d-%H%M).tar.gz source
 
 clean:
 	rm -rf $(TRG_DIR)
@@ -27,14 +28,14 @@ test: tutorial.svg example2.svg example3.svg import_package1.svg
 	#for i in $?; do \
 	#	diff -s $(TRG_DIR)/$$i test/$$i; \
 	#done
-test1: tutorial.puml
-	cat $(TRG_DIR)/$?
-test2: example2.puml
-	cat $(TRG_DIR)/$?
-test3: example3.puml
-	cat $(TRG_DIR)/$?
-testimport: import_package1.puml
-	cat $(TRG_DIR)/$?
+test1: tutorial.show_puml tutorial.svg 
+
+test2: example2.show_puml example2.svg
+
+test3: example3.show_puml example3.svg
+
+testimport: import_package1.show_puml import_package1.svg
+	#cat $(TRG_DIR)/$?
 testimport2:
 	$(TRG_DIR)/pro2pu -Itest test/import_package1.proto
 test4a:
@@ -53,7 +54,10 @@ test5:
 %.svg: $(TRG_DIR)/%.puml
 	$(PUML) -tsvg $(TRG_DIR)/$(*F).puml
 
-.PHONY: test
+%.show_puml: $(TRG_DIR)/%.puml
+	cat $(TRG_DIR)/$(*F).puml
+
+.PHONY: test %.show_puml
 
 connect_to_odin:
 	$(ELI) -r

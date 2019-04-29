@@ -18,7 +18,7 @@ MapField: "{field} +" [PtgOutId $1 int] " : map<" [PtgOutId $2 int] ":" [PtgOutI
 EnumItem: [PtgOutId $1 int]
 
 /* e.g. AddressBook o-- Person : repeated, formerly: PTGLink */
-RelationUsing: $1 " o-- " [PtgOutId $2 int] " : " $3
+RelationUsing: $1 " o-- " $2 " : " $3
 
 /* Newline sequence with optional arguments */
 NlSeq: $1 {[IndentNewLine]} $2

@@ -238,7 +238,7 @@ char *auxEOF(start, length) char *start; int length;
   descr = try_open (name, 0);
   if (descr < 0)
   {
-    fprintf(stderr, "Failed opening file '%s'\n", name);
+    fprintf(stderr, "Failed to open file '%s'\n", name);
     return start;
   }
 

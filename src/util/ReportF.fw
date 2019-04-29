@@ -1,0 +1,198 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+Extends
+
+~O~<ReportF.specs~>==~{
+/* Report via messaging.h */
+/* $/CxxMods/messaging.fw */
+~}
+
+~O~<ReportF.head~>==~{
+#include "ReportF.h"
+~}
+
+~O~<ReportF.h~>==~{
+#ifndef ELSY_REPORTF_H
+#define ELSY_REPORTF_H
+#include "err.h" // CoordPtr, (message)
+#include <stdarg.h> // va_list
+/*#include "messaging.h" // redefines ERROR in err.h */
+
+/* definitions found in err.h
+/*
+/* #define NOTE    0       /* Nonstandard construct */
+/* #define COMMENT 0       /* Obsolete */
+/* #define WARNING 1       /* Repairable error */
+/* #define ERROR   2       /* Unrepairable error */
+/* #define FATAL   2       /* Obsolete */
+/* #define DEADLY  3       /* Error that makes continuation impossible */
+#define DEBUG  8        // Emit message in debug mode
+#define SILENT 9        // Emit no message
+
+extern void ReportF( int severity, CoordPtr p, const char* format, ... ) 
+  __attribute__((format(printf, 3, 4))); // have gcc check format at 3, first varg at 4
+extern char* sprintfall( const char* format, ... )
+  __attribute__((format(printf, 1, 2)));
+extern char* vsprintfall( const char* format, va_list ap )
+  __attribute__((format(printf, 1, 0))); // no "...", just check format consistency
+
+extern void Report(int severity, CoordPtr p, const char* text );
+
+/* // continuation variant
+/* typedef struct ReportF_continuation {
+/*   int severity;
+/*   CoordPtr coord;
+/*   const char* text;
+/* } ReportF_continuation ;
+/* 
+/* extern ReportF_continuation mk_ReportF( int severity, CoordPtr p, const char* format, ... )
+/*   __attribute__((format(printf, 3, 4)));
+/* 
+/* // Create messaging continuation that does nothing
+/* extern ReportF_continuation empty_ReportFC();
+*/
+
+/*  WITH-clause syntax does not permit attributes or function calls
+/* extern (void(*)(void*,void*)) with_ReportF( void (*with_f)(void*,void*), int severity, CoordPtr p, const char* format, ... )
+/*   __attribute__((format(printf, 4, 5)));
+/* 
+/* // functions that go with_ReportF
+/* extern void* FST(void* a, void* b);
+/* extern void* SND(void* a, void* b);
+*/
+
+#endif // ELSY_REPORT_H
+
+~}
+
+~O~<ReportF.c~>==~{
+#include "ReportF.h"
+// #include "messaging.h" // Report
+#include "clp.h"
+
+/**
+ * Performs printf and allocates a string of a suitable size for it.
+ * The user must delete the allocated result after use.
+ */
+char* sprintfall( const char* format, ... )
+{
+  va_list args;
+  va_start(args, format);
+
+  char* buf= vsprintfall(format,args);
+
+  va_end(args);
+  return buf;
+}
+
+char* vsprintfall( const char* format, va_list ap )
+{
+  size_t buf_size= 128;
+  size_t chars_used;
+  char* buf= (char*)malloc(buf_size);
+  va_list aq;
+  while(1) {
+    // copy argument list cursor position, in case we need to realloc
+    va_copy( aq, ap );
+    // have vsnprintf iterate through the args
+    chars_used= vsnprintf(buf,buf_size,format,aq);
+    // reallocate if vsnprintf used all the space (leaving no \0)
+    if(chars_used >= buf_size) { // chars_used does not count final \0
+      buf_size *= 2;
+      buf= (char*)realloc(buf, buf_size);
+      va_end( aq );
+      continue;
+    }
+    buf= (char*)realloc(buf,chars_used+1); // shrink; +1 for final \0
+    va_end( aq );
+    break;
+  }
+  return buf;
+}
+
+/**
+ * see http://www.cplusplus.com/reference/cstdio/vsprintf/
+ */
+void ReportF(int severity, CoordPtr p, const char* format, ...)
+{
+#ifdef Debug // when a CLP option is defined
+#ifdef DEBUG // when a DEBUG level is defined in messaging
+  // print debug messages only when -Debug flag is set
+  if(severity == DEBUG && !Debug) return;
+#endif
+#endif
+
+#ifdef SILENT // when a SILENT level is defined
+  if(severity == SILENT) return;
+#endif
+
+if(severity == DEBUG) // local define of DEBUG obscures messaging, so we change it manually
+{
+  severity = NOTE;
+  Report(NOTE,p,"DEBUG MESSAGE FOLLOWING:");
+}
+
+  va_list args;
+  va_start(args, format);
+
+  char* buf= vsprintfall(format,args);
+  Report(severity,p,buf);
+
+  free(buf); // discard buffer after use
+  va_end(args);
+}
+
+void Report(int severity, CoordPtr p, const char* text )
+{
+  int grammar = 0; /* 1 to print AG line number */
+  message( severity, text, grammar, p );
+}
+
+/*ReportF_continuation* ReportF_make(int severity, CoordPtr p, const char* format, ...)
+/*{
+/*#ifdef SILENT
+/*  if(severity == SILENT) return ReportF_empty()
+/*#endif
+/*  va_list args;
+/*  va_start(args, format);
+/*
+/*  char* buf= vsprintfall(format,args);
+/*  
+/*  ReportF_continuation* ret = (ReportF_continuation)malloc(sizeof(ReportF_continuation));
+/*  ret->severity = severity;
+/*  ret->coord = p;
+/*  ret->text = buf;
+/*
+/*  va_end(args);
+/*  
+/*  return ret;
+/*}
+/*
+/*ReportF_continuation* ReportF_empty()
+/*{
+/*  return 0;
+/*}
+/*
+/*void ReportF_exec( ReportF_continuation* cont )
+/*{
+/*  if( !cont ) return; // dont message or cleanup if empty
+/*  Report( cont.severity, cont.coord, cont.text );
+/*  free(cont.text); // discard buffer after use
+/*  free(cont);
+/*}
+*/
+
+/*(void(*)(void*,void*)) with_ReportF( void (*with_f)(void*,void*), int severity, CoordPtr coord, const char* format, ... )
+/*{
+/*
+/*  ReportF(severity,coord,format,...);
+/*  return with_f;
+/*}
+/*
+/*void* FST(void* a, void* b) { return a; }
+/*void* SND(void* a, void* b) { return b; }
+*/
+
+~}

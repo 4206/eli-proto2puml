@@ -2,8 +2,8 @@ pro2pu.gla
 pro2pu.con
 $/Input/Include.gnrc:inst
 $/Input/CurrTok.gnrc:inst
-ImportDefer.fw 
-ImportDefer.fw :fwGen/ImportDefer.c  /* select preferred auxEOF definition */
+util/ImportDefer.fw 
+util/ImportDefer.fw :fwGen/ImportDefer.c  /* select preferred auxEOF definition */
 
 $/Output/PtgCommon.fw
 pro2pu.ptg
@@ -15,7 +15,13 @@ $/Output/Indent.fw
 pro2pu.lido
 ior.fw
 
-ensure_idn.fw
+util/ensure_idn.fw
 concat_id_with_dot.fw
 
 pro2pu.clp
+
+
+$/Prop/PropLib.fw /* KReset */
+pro2pu.pdl
+
+util/ReportF.fw
