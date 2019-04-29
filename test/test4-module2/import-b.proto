@@ -1,0 +1,8 @@
+syntax = "proto2";
+import public "somefile-b.proto";
+
+package test4_module2;
+
+message ImportB {
+  required MessageB message_b = 1;
+}

@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+package test4_module2_somefile_a;
+
+message MessageA_Wrong {
+  required string if_this_is_imported_then_test_failed = 1;
+}

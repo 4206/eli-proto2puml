@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+package test4_module1_somefile_b;
+
+message MessageB {
+  required string name = 1;
+}

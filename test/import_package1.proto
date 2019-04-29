@@ -4,5 +4,5 @@ import public "import_package2.proto";
 package import_package1;
 
 message Message1 {
-  required string name1 = 1;
+  required Message2 name1 = 1;
 }

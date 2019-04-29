@@ -1,0 +1,10 @@
+syntax = "proto2";
+import "test4-module1/import-a.proto";
+import "test4-module2/import-b.proto";
+
+package test4;
+
+message Test4 {
+  required Import1 import_1 = 1;
+  required Import2 import_2 = 2;
+}

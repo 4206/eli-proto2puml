@@ -1,14 +1,14 @@
 syntax = "proto2";
 import public "other2.proto";
-option java_package = "com.example.foo";
+// option java_package = "com.example.foo";  // protoc complains
 enum EnumAllowingAlias {
-  option allow_alias = true;
+  //option allow_alias = true;  // protoc complains
   UNKNOWN = 0;
   STARTED = 1;
-  RUNNING = 2 [(custom_option) = "hello world"];
+  RUNNING = 2; //[(custom_option) = "hello world"]; // protoc complains
 }
 message outer {
-  option (my_option).a = true;
+  //option (my_option).a = true;  // protoc complains
   message inner {   // Level 2
     required int64 ival = 1;
   }
