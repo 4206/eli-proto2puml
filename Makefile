@@ -20,6 +20,8 @@ parsable:
 mon:
 	$(ELI) "$(SRC_DIR)/pro2pu.specs +monitor +arg='test/example2.proto' :mon"
 
+svg: tutorial.svg example2.svg example3.svg import_package1.svg
+
 test: tutorial.svg example2.svg example3.svg import_package1.svg
 	# compare with reference outputs
 	#for i in $?; do \

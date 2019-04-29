@@ -1,6 +1,7 @@
+/* TODO: add note to PUML if there have been errors parsing .proto */
 /* DONE: syntax level 3 */
 /* TODO: collect groups -> ignored */
-/* TODO: collect oneof  -> how do they work?  */
+/* DONE: collect oneof  */
 /* DONE: collect map    */
 /* DONE: remove package if no package is given */
 /* TODO: clp for include directories */

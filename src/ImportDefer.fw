@@ -52,6 +52,9 @@ IncludeDir "-I" "--include=" joinedto strings "Include directory imports";
 #include "csm.h"
 #include "clp.h"
 
+// import LineNum
+#include "err.h"
+
 //#define PDEBUG(X) X
 #define PDEBUG(X) 
 
@@ -107,17 +110,24 @@ void DeferInput(char* filename)
   { trimmed = filename; }
 
   // TODO: store CWD
-  //char cwd[1024]; // limited by os
-  //getcwd(cwd, sizeof(cwd));
-  //PDEBUG(printf("Current working dir: %s\n", cwd));
+  char cwd[1024]; // limited by os
+  getcwd(cwd, sizeof(cwd));
+  //printf("Working dir of process: %s\n", cwd);
+  // TODO: get directory of currently included file
 
-  // iterate queued names
+  const char* included_by = MapFile(LineNum);
+  //printf("LineNum=%d, MapFile=%s\n", LineNum, included_by);
+  // TODO: strip filename at the end
+  // TODO: prepend cwd
+  // TODO: store with queue request
+
   // check if already requested
   ImportRequest* r = import_requests;
   for (; r && r->next; r=r->next)
   { if (0 == strcmp(trimmed, r->filename))
     { return; }  // skip already requested files
   }
+  // postcondition: r now points to the last item in the queue
 
   // create new struct for storing filename and 'visited' flag
   ImportRequest* new = (ImportRequest*)malloc(sizeof(ImportRequest));
