@@ -14,6 +14,9 @@
 extern int ior(int a, int b);
 extern int ior_package(int a, int b);
 
+#include "envmod.h"
+extern void dump_env_keys(Environment env);
+
 #endif // IOR_H
 
 ~}
@@ -38,6 +41,15 @@ int ior_package(int a, int b)
   }
   else
     return a ? a : b;
+}
+
+void dump_env_keys(Environment env)
+{
+  fprintf(stderr,"Env:\n");
+  for(Binding b=DefinitionsOf(env);b;b=NextDefinition(b))
+  {
+    fprintf(stderr,"-  %s\n",StringTable(IdnOf(b)));
+  }
 }
 
 ~}

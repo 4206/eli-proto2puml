@@ -9,6 +9,8 @@ message Other {
     required string url = 2;
     optional string title = 3;
     repeated string snippets = 4;
+    optional string to = 5;
+    optional string to2 = 6;
   }
   oneof foo {
     string name = 4;

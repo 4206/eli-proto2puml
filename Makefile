@@ -1,6 +1,8 @@
 ELI=/opt/eli/bin/eli
 SRC_DIR=src
 TRG_DIR=target
+TEST_DIR=test-interfaces
+#TEST_DIR=test
 PUML=plantuml
 
 exe:
@@ -18,8 +20,9 @@ clean:
 parsable:
 	$(ELI) "$(SRC_DIR)/pro2pu.specs :parsable >"
 
-mon:
-	$(ELI) "$(SRC_DIR)/pro2pu.specs +monitor +arg='test/example2.proto' :mon"
+%.mon:
+	$(ELI) "$(SRC_DIR)/pro2pu.specs +monitor +arg='$(TEST_DIR)/$(*F).proto' :mon"
+
 
 svg: tutorial.svg example2.svg example3.svg import_package1.svg
 
@@ -28,13 +31,13 @@ test: tutorial.svg example2.svg example3.svg import_package1.svg
 	#for i in $?; do \
 	#	diff -s $(TRG_DIR)/$$i test/$$i; \
 	#done
-test1: tutorial.show_puml tutorial.svg 
+test1: tutorial.puml_show tutorial.svg 
 
-test2: example2.show_puml example2.svg
+test2: example2.puml_show example2.svg
 
-test3: example3.show_puml example3.svg
+test3: example3.puml_show example3.svg
 
-testimport: import_package1.show_puml import_package1.svg
+testimport: import_package1.puml_show import_package1.svg
 	#cat $(TRG_DIR)/$?
 testimport2:
 	$(TRG_DIR)/pro2pu -Itest test/import_package1.proto
@@ -46,18 +49,22 @@ test5:
 	$(TRG_DIR)/pro2pu -Itest test/wolken/Wolken.proto > $(TRG_DIR)/Wolken.puml
 	cat $(TRG_DIR)/Wolken.puml
 	plantuml -tsvg $(TRG_DIR)/Wolken.puml
+test6: Bel.svg
+
+test7: test7.svg
+
 
 %.puml: 
-	cd test; ../$(TRG_DIR)/pro2pu $(*F).proto > ../$(TRG_DIR)/$(*F).puml
+	cd $(TEST_DIR); ../$(TRG_DIR)/pro2pu $(*F).proto > ../$(TRG_DIR)/$(*F).puml
 %.png: $(TRG_DIR)/%.puml
 	$(PUML) -tpng $(TRG_DIR)/$(*F).puml
 %.svg: $(TRG_DIR)/%.puml
 	$(PUML) -tsvg $(TRG_DIR)/$(*F).puml
 
-%.show_puml: $(TRG_DIR)/%.puml
+%.puml_show: $(TRG_DIR)/%.puml
 	cat $(TRG_DIR)/$(*F).puml
 
-.PHONY: test %.show_puml
+.PHONY: test %.puml_show %.mon
 
 connect_to_odin:
 	$(ELI) -r

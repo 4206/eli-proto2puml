@@ -2,6 +2,7 @@
 C_COMMENT
 $[/][/] (auxEOL)
 
+gla_kwd_to: $to [mkidn]
 
 gla_upper: $[A-Z_][A-Za-z_0-9]* [mkidn]
 gla_lower: $[a-z_][A-Za-z_0-9]* [mkidn]

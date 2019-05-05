@@ -3,7 +3,8 @@ Package: "package \"" [PtgOutId $1 int]  "\" {" [IndentIncr] [IndentNewLine] $2 
 Class: "class " $1 " {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
 Enum: "enum " $1 " {"  [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
 
-NoPackage: "package \"\" {" [IndentIncr] [IndentNewLine] $1 [IndentDecr] [IndentNewLine] "}"
+/* don't print default package if there is no content */
+NoPackage: {"package \"\" {" [IndentIncr] [IndentNewLine]} $1 {[IndentDecr] [IndentNewLine] "}"}
 
 /* e.g. {field} +optional type : PhoneType */
 Field: "{field} +" $3 " " [PtgOutId $1 int] " : " [PtgOutId $2 int]
@@ -28,3 +29,8 @@ DotSeq: $1 {"."} $2
 PUML: "@startuml" [IndentNewLine] $ [IndentNewLine] "@enduml" [IndentNewLine]
 
 oneofVariant: [PtgOutId $1 int ] " variant"
+
+/*  ORDER(PTGOut(PTGKRDebug(PTGAsIs("KResetQualifiedName"),NAME_PTG,IDN) */
+/*KRDebug: "KResetQualifiedName: " $1 " <- " [PtgOutId $2 int] [IndentNewLine]*/
+
+SourceFile: "'source file: " [CPtgOutstr $1 string] /*   const char* included_by = MapFile(LineNum); */

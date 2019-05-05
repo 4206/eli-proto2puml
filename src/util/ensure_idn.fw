@@ -23,10 +23,20 @@ typedef int StringTableKey;
  */
 extern StringTableKey ensure_idn( const char* str );
 
+/** Like ensure_idn, but takes a maximum of n characters */
+extern StringTableKey ensure_nidn( const char* str, int n );
+
 /** Enter int into the StringTable.
  *  Behave like ensure_idn, but convert int to string first.
  */
 extern StringTableKey ensure_int_idn( int i );
+
+/** Enter slice of str into the StringTable, like ensure_idn,
+ * but end at lastchar. 
+ * Lastchar must be within str.
+ * Behaviour is undefined if lastchar is before str, or if lastchar is not within str.
+ */
+extern StringTableKey ensure_idn_substr( const char* str, const char* lastchar );
 
 /** Concatenate two keys, inserting a single whitespace in between
  */
@@ -48,6 +58,13 @@ StringTableKey ensure_idn(const char* str)
 {
   int t,s;
   mkidn(str,strlen(str),&t,&s);
+  return s;
+}
+
+StringTableKey ensure_nidn( const char* str, int n )
+{
+  int t,s;
+  mkidn(str,n,&t,&s);
   return s;
 }
 

@@ -88,7 +88,7 @@ void init_import_requests()
  * with relative paths in the import statement */
 void DeferInput(char* filename)
 {
-  PDEBUG(printf("DeferImport(%s)\n", filename));
+  PDEBUG(fprintf(stderr,"DeferImport(%s)\n", filename));
 
   // check if queue is initialized
   init_import_requests();
@@ -123,10 +123,14 @@ void DeferInput(char* filename)
 
   // check if already requested
   ImportRequest* r = import_requests;
-  for (; r && r->next; r=r->next)
-  { if (0 == strcmp(trimmed, r->filename))
+  for (; r; r=r->next)
+  { 
+    if (0 == strcmp(trimmed, r->filename))
     { return; }  // skip already requested files
+
+    if (! r->next) break; // advance pointer only until last valid element
   }
+  
   // postcondition: r now points to the last item in the queue
 
   // create new struct for storing filename and 'visited' flag
@@ -138,8 +142,8 @@ void DeferInput(char* filename)
   
   r->next = new;  // append to tail
 
-  PDEBUG(printf("registered '%s' for import\n", trimmed));
-
+  PDEBUG(fprintf(stderr,"registered '%s' for import\n", trimmed));
+  PDEBUG(fprintf(stderr,"\n"));
   //NextImport();
 }
 
