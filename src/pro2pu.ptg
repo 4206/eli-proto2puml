@@ -1,10 +1,11 @@
 /** **/
 Package: "package \"" [PtgOutId $1 int]  "\" {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
-Class: "class " $1 " {" [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
-Enum: "enum " $1 " {"  [IndentIncr] [IndentNewLine] $2 [IndentDecr] [IndentNewLine] "}"
-
 /* don't print default package if there is no content */
 NoPackage: {"package \"\" {" [IndentIncr] [IndentNewLine]} $1 {[IndentDecr] [IndentNewLine] "}"}
+
+Class: "class " $1 " as \"" [PtgOutId $2 int] "\" {" [IndentIncr] [IndentNewLine] $3 [IndentDecr] [IndentNewLine] "}"
+Enum: "enum " $1 " as \"" [PtgOutId $2 int] "\" {"  [IndentIncr] [IndentNewLine] $3 [IndentDecr] [IndentNewLine] "}"
+
 
 /* e.g. {field} +optional type : PhoneType */
 Field: "{field} +" $3 " " [PtgOutId $1 int] " : " [PtgOutId $2 int]
@@ -24,7 +25,10 @@ RelationUsing: $1 " o-- " $2 " : " $3
 /* Newline sequence with optional arguments */
 NlSeq: $1 {[IndentNewLine]} $2
 
-DotSeq: $1 {"."} $2
+/*DotSeq: $1 {"."} $2*/
+
+/* inner dot or $ shall be omitted if $1 or $3 are PTGNULL */
+Seq3 : $1 {$2} $3
 
 PUML: "@startuml" [IndentNewLine] $ [IndentNewLine] "@enduml" [IndentNewLine]
 

@@ -25,3 +25,5 @@ $/Prop/PropLib.fw /* KReset */
 pro2pu.pdl
 
 util/ReportF.fw
+
+$/Adt/List.gnrc+instance=DefTableKey +referto=deftbl :inst /* DefTableKeyList for TypeDef & TypeUse */

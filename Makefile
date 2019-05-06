@@ -1,8 +1,8 @@
 ELI=/opt/eli/bin/eli
 SRC_DIR=src
 TRG_DIR=target
-TEST_DIR=test-interfaces
-#TEST_DIR=test
+#TEST_DIR=test-interfaces
+TEST_DIR=test
 PUML=plantuml
 
 exe:
@@ -53,6 +53,17 @@ test6: Bel.svg
 
 test7: test7.svg
 
+test8: test8.svg
+
+INDEX.proto:
+	echo 'syntax = "proto3";' > $(TRG_DIR)/INDEX.proto
+	find test-interfaces-sorted -name "*.proto" | sed 's/^\(.*\)/import "\1";/' >> $(TRG_DIR)/INDEX.proto
+
+
+INDEX.puml: $(TRG_DIR)/INDEX.proto
+	$(TRG_DIR)/pro2pu $(TRG_DIR)/INDEX.proto > $(TRG_DIR)/INDEX.puml
+INDEX.svg: $(TRG_DIR)/INDEX.puml
+	$(PUML) -tsvg $(TRG_DIR)/INDEX.puml
 
 %.puml: 
 	cd $(TEST_DIR); ../$(TRG_DIR)/pro2pu $(*F).proto > ../$(TRG_DIR)/$(*F).puml

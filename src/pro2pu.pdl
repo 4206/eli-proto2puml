@@ -1,5 +1,7 @@
-QualifiedName: PTGNode [Has,KReset]; "ptg_gen.h" /* TODO: deprecate */
+QualifiedName: PTGNode [Has,KReset]; "ptg_gen.h"
 
 PackageNameCandidates: Environment [Unique]; "envmod.h"
+TypeInstCandidates: DefTableKeyList [Unique]; "DefTableKeyList.h"
+
 Pos: CoordPtr [KReset]; "coord.h"
-FullName: int [KReset];
+/* FullName: int [KReset]; /* deprecated */

@@ -1,0 +1,10 @@
+syntax = "proto3";
+import "test7.proto";
+
+package Test7.BB;
+
+message YY {
+	repeated int32 y = 1;
+	repeated Test7.AA.XX aa= 2;
+}
+
