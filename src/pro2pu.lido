@@ -359,17 +359,20 @@ CLASS SYMBOL qualifiedName INHERITS contributesSubclass END;
 %// get qualfied name; if none found, default to key as type
 %// TODO: recognized already-qualified names being used as keys
 #define lazy_GetQualifiedName(KEY,DFLT_SYM,PKG_SYM,MESG) \
+ORDER( /*fprintf(stderr,"(%d)++%s\n",DFLT_SYM, StringTable(DFLT_SYM)),*/\
   IF( HasQualifiedName(KEY)\
     , GetQualifiedName(KEY,PTGNULL)\
     , ORDER(ReportF(NOTE,COORDREF,MESG,StringTable(DFLT_SYM),StringTable(PKG_SYM)),\
+            /*dump_env_keys(INCLUDING ROOTCLASS.custom_types),*/\
             PTGId(DFLT_SYM))\
-    )
+    )\
+  )
 
 RULE rField: Field ::= Label FieldType FieldName FieldNumber FieldOptions COMPUTE
   %// label can be empty in v3
 
   Field.field_ptg = PTGField(FieldName.sym, FieldType.sym, PTGId(Label.sym));
-
+/*fprintf(stderr, "(%d)--%s \n", FieldType.sym, StringTable(FieldType.sym));*/
   %// TODO: do something with Field default in optional fields ?
   %// Field.field_ptg = PTGFieldWithDefault(FieldName.sym, FieldType.sym, PTGAsIs("optional"), FieldDefault.sym);
 
@@ -504,8 +507,8 @@ RULE rPrimitiveType_bytes:    PrimitiveType ::= 'bytes'    COMPUTE PrimitiveType
 
 CLASS SYMBOL TypeUse: is_custom: int /*Binding*/ SYNT;
 CLASS SYMBOL TypeUse: custom_type_key: DefTableKey SYNT;
-CLASS SYMBOL TypeUse: type_basename: int SYNT;
-CLASS SYMBOL TypeUse: type_package : int SYNT;
+/*CLASS SYMBOL TypeUse: type_basename: int SYNT;
+CLASS SYMBOL TypeUse: type_package : int SYNT;*/
 CLASS SYMBOL TypeUse COMPUTE
   %// From the spec (https://developers.google.com/protocol-buffers/docs/proto#packages-and-name-resolution):
   %// Type name resolution in the protocol buffer language works like C++: 
@@ -531,11 +534,14 @@ CLASS SYMBOL TypeUse COMPUTE
    *
    * THIS.sym may contain dots, even a leading dot
    */
-  SYNT.custom_type_key = IF( THIS.is_custom, KeyOf(lookup_class_in_typedict( INCLUDING ROOTCLASS.custom_types, THIS.qualified_classname_sym_chn, THIS.sym )), NoKey);
+  SYNT.custom_type_key = IF( THIS.is_custom
+                           , KeyOf(lookup_class_in_typedict( INCLUDING ROOTCLASS.custom_types, THIS.qualified_classname_sym_chn, THIS.sym ))
+                           , NoKey);
 
   %// every non-primitive type (i.e. synthesized from ident, not from PrimitiveType) is custom
   SYNT.is_custom = CONSTITUENTS ident.sym WITH (int,ADD,IDENTICAL,ZERO);
 
+/*
   %// type name may be given qualified or unqualified
   %// split off type name after last dot
   SYNT.type_basename = IF( strrchr(StringTable(THIS.sym), '.')
@@ -547,7 +553,7 @@ CLASS SYMBOL TypeUse COMPUTE
   SYNT.type_package = IF( strrchr(StringTable(THIS.sym), '.')
                         , ensure_nidn(StringTable(THIS.sym), SUB( strrchr(StringTable(THIS.sym), '.'), StringTable(THIS.sym)) )
                         , INCLUDING ProtoDoc.package_name );
-
+*/
 
 
 

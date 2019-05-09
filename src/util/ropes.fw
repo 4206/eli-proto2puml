@@ -23,7 +23,7 @@ extern int startswith(const char* str, const char* prefix);
 /* return nonzero on success (aka. bool) */
 extern int endswith(const char* str, const char* suffix);
 
-/* ATTN: parameter segs must have capacity allocated to contain all segments from segs */
+/* ATTN: parameter buf must have capacity allocated to contain all segments from segs */
 extern char* concat_n(char* buf, char** segs, char* sep, int nsegs);
 
 #endif // ROPES_H
@@ -33,6 +33,7 @@ extern char* concat_n(char* buf, char** segs, char* sep, int nsegs);
 ~O~<ropes.c~>==~{
 #include "ropes.h"
 #include <string.h>
+#include <stdio.h>
 
 /* count occurrences of a separator within a string */
 int cntchr(const char s[], const char sep)
@@ -53,13 +54,14 @@ int startswith(const char* str, const char* prefix)
 /* return bool */
 int endswith(const char* str, const char* suffix)
 {
+//fprintf(stderr,"endswith(%s,%s)\n",str,suffix);
   int suf_len = strlen(suffix);
   if (suf_len > strlen(str)) return 0; // return false
-//fprintf(stderr,"endswith(%s,%s) == %d via %s\n",str,suffix,strncmp(str-suf_len-1, suffix, suf_len),str-suf_len-1);
-  return 0 == strncmp(str-suf_len-1, suffix, suf_len);
+//fprintf(stderr,"endswith(%s,%s) == %d via %s\n",str,suffix,strncmp(str+strlen(str)-suf_len, suffix, suf_len),str+strlen(str)-suf_len);
+  return 0 == strncmp(str+strlen(str)-suf_len, suffix, suf_len);
 }
 
-/* res must have capacity allocated to contain all segments from segs */
+/* buf must have capacity allocated to contain all segments from segs */
 char* concat_n(char* buf, char** segs, char* sep, int nsegs)
 {
   buf[0] = 0;

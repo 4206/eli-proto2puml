@@ -56,9 +56,14 @@ extern Binding lookup_class_in_typedict( Environment env, int path, int classnam
 #include "csm.h" // extern char* StringTable( int i )
 #include "ropes.h"
 
+#define PDEBUG3(X)
+
+Binding full_match_with( Environment env, char* full_type );
+Binding match_bindings_with( Environment env, char* prefix, char* suffix ); // forward decl
+
 Binding lookup_class_in_typedict( Environment env, int prefix, int suffix )
 {
-//fprintf(stderr,"pre=%s suf=%s\n",StringTable(prefix),StringTable(suffix));
+PDEBUG3(fprintf(stderr,"LOOKUP pre=%s suf=%s\n",StringTable(prefix),StringTable(suffix)));
 
   if (suffix == 0) return NoBinding;
 
@@ -71,9 +76,33 @@ Binding lookup_class_in_typedict( Environment env, int prefix, int suffix )
   // until exactly 1 match is found
   // if multiple matches are found after shortening (extending) the prefix by 1 step, then the type dict is erroneous
 
-  char* pre_str = StringTable(prefix);
-  char* suf_str = StringTable(suffix);
-  char pre_buf[strlen(pre_str)+1]; // working buffer for prefix incremenets
+  int suffix_starts_with_dot = startswith(StringTable(suffix), "."); // reverse refinement direction if type starts with a dot
+  int top_down = suffix_starts_with_dot;
+
+  // prefix type with a dot if there is none, so we don't confuse "Status" with "ProzessStatus"
+  int suf_len = strlen(StringTable(suffix))+1; // +1 term, +1 extra dot
+  char suf_str[suf_len]; 
+  char dot_suf_str[suf_len+1];
+  if (suffix_starts_with_dot)
+  { 
+    snprintf( suf_str    , suf_len-1, "%s", StringTable(suffix)+1 ); // skip leading dot
+    snprintf( dot_suf_str, suf_len  , "%s", StringTable(suffix)   ); // keep leading dot
+  }
+  else
+  { 
+    snprintf( suf_str    , suf_len  ,  "%s", StringTable(suffix) ); // keep without dot
+    snprintf( dot_suf_str, suf_len+1, ".%s", StringTable(suffix) ); // insert leading dot
+  }
+  //fprintf(stderr, ">'%s' >>'%s'\n", StringTable(suffix), suf_str);
+
+  // strtok will modify its first argument (WTF?) therefore we need a copy 
+  //char* pre_str = StringTable(prefix);
+  int pre_len = strlen(StringTable(prefix))+1; // +1 term
+  char pre_str[pre_len];
+  snprintf( pre_str, pre_len, "%s", StringTable(prefix) );
+  
+  char pre_buf[pre_len]; // working buffer for prefix incremenets
+
 
   // split prefix into segments along dot
   int n_pre_segs = cntchr(pre_str , '.') + 1;
@@ -84,110 +113,79 @@ Binding lookup_class_in_typedict( Environment env, int prefix, int suffix )
   int i;
   for( i=0, ptr = strtok(pre_str, delimiter); ptr != NULL; ptr = strtok(NULL, delimiter) )
   { pre_seg[i++] = ptr; }
- 
 
-  /* debug
-  fprintf(stderr,"found %d segsments\n",n_pre_segs);
-  for(int i=0;i<n_pre_segs;i++)
-  { fprintf(stderr,"-%s\n",pre_seg[i]); }
-  */
-
- 
-  int nsegs_used;
-  int top_down;
-  if ( startswith(suf_str, ".") )
-  {
-    top_down = 1;   // reverse refinement direction
-    suf_str++;      // skip leading dot
-    pre_buf[0] = 0; // start with empty prefix INSIDE the space already allocated (for re-building it step-by-step)
-  }
-  else
-  {
-    top_down = 0;
-  }
-
+  // check if there is a full match before trying approximate matches
+PDEBUG3(fprintf(stderr,"pre=%s suf=%s 1\n", StringTable(prefix), StringTable(suffix) ));
+  res = full_match_with( env, suf_str );
+  if (res) { 
+PDEBUG3(fprintf(stderr,"pre=%s suf=%s 1match with %s\n", StringTable(prefix), StringTable(suffix), StringTable(IdnOf(res)) ));
+    return res; }
   
+  int nsegs_used;
   if (top_down)
   {
+    pre_buf[0] = 0; // start with empty prefix INSIDE the space already allocated (for re-building it step-by-step)
+
     for(nsegs_used = 0; nsegs_used <= n_pre_segs; nsegs_used++ )
     {
       // build a new prefix from the first n segments
-      /*pre_buf =*/ concat_n(pre_buf, pre_seg, ".", nsegs_used);
+      concat_n(pre_buf, pre_seg, ".", nsegs_used);
 
-      // search through all the fully qualified type names
-      for( Binding b=DefinitionsOf(env); b; b=NextDefinition(b))
-      {
-        const char* cand_name = StringTable(IdnOf(b));
-//fprintf(stderr,"cand=%s\n",cand_name);
-        if (startswith(cand_name, pre_buf) && endswith(cand_name, suf_str))
-        {
-          if ( res != NoBinding )
-          { 
-            fprintf(stderr,"Note: multiple matching types for '%s'~@'%s'\n", pre_buf, suf_str);
-            if (strlen(StringTable(IdnOf(b))) < strlen(StringTable(IdnOf(res)))) { res = b; } // shorter names are closer to the hierarchy level
-          }
-          else
-          { res = b; }
-        }
-      }
+      res = match_bindings_with( env, pre_buf, dot_suf_str );
+
       // abort if a matching type was found
-      if (res) return res;
+      if (res) { return res; }
     }
-
-    // TODO
     return NoBinding;
   }
   else
   {
+PDEBUG3(fprintf(stderr,"pre=%s suf=%s 2\n", StringTable(prefix), StringTable(suffix) ));
     for(nsegs_used = n_pre_segs; nsegs_used >= 0; nsegs_used-- )
     {
       // build a new prefix from the first n segments
-      /*pre_buf =*/ concat_n(pre_buf, pre_seg, ".", nsegs_used);
-
-      // search through all the fully qualified type names
-      for( Binding b=DefinitionsOf(env); b; b=NextDefinition(b))
-      {
-        const char* cand_name = StringTable(IdnOf(b));
-//fprintf(stderr,"cand=%s\n",cand_name);
-        if (startswith(cand_name, pre_buf) && endswith(cand_name, suf_str))
-        {
-          if ( res != NoBinding )
-          {
-            //fprintf(stderr,"Note: multiple matching types for '%s'~@'%s'\n", pre_buf, suf_str);
-            if (strlen(StringTable(IdnOf(b))) < strlen(StringTable(IdnOf(res)))) { res = b; } // shorter names are closer to the hierarchy level
-          }
-          else
-          { res = b; }
-        }
-      }
+      concat_n( pre_buf, pre_seg, ".", nsegs_used );
+PDEBUG3(fprintf(stderr,"pre=%s suf=%s pre_buf=%s dot_suf=%s 2+\n", StringTable(prefix), StringTable(suffix), pre_buf, dot_suf_str ));
+      res = match_bindings_with( env, pre_buf, dot_suf_str );
+PDEBUG3(fprintf(stderr,"pre=%s suf=%s pre_buf=%s '%s'\n", StringTable(prefix), StringTable(suffix), pre_buf, StringTable(IdnOf(res)) ));
       // abort if a matching type was found
-      if (res) return res;
+      if (res) { return res; }
     }
-    return NoBinding;
   }
-
-  /*
-
-  char delimiter[] = "."; 
-  char *ptr;
-
-  int n_pre_segs = cntchr(pre_str , '.')+1;
-  int n_suf_segs = cntchr(suf_str, '.')+1;
-
-  char pre_seg[][n_pre_segs];
-  char suf_seg[][n_suf_segs];
-
-  // fill in segments
-  int i;
-  for( i=0, ptr = strtok(pre_str, delimiter); ptr != NULL; ptr = strtok(NULL, delimiter) )
-  { pre_seg[i] = ptr; }
-  for( i=0, ptr = strtok(suf_str, delimiter); ptr != NULL; ptr = strtok(NULL, delimiter) )
-  { suf_seg[i] = ptr; }
-
-  // TODO:
-  return NoKey;
-  */
 }
 
+Binding match_bindings_with( Environment env, char* prefix, char* suffix )
+{
+  Binding res = NoBinding;
+  // search through all the fully qualified type names
+  for (Binding b= DefinitionsOf(env); b; b=NextDefinition(b))
+  {
+    const char* cand_name = StringTable(IdnOf(b));
+PDEBUG3(fprintf(stderr,"pre=%s suf=%s cand=%s startswith=%d endswith=%d\n", prefix, suffix, cand_name,startswith(cand_name, prefix),endswith(cand_name,suffix)));
+    if (startswith(cand_name, prefix) && endswith(cand_name, suffix))
+    {
+      // always prefer a shorter fully qualified typename
+      if (res==NoBinding || strlen(cand_name) < strlen(StringTable(IdnOf(res))))
+      {
+        res = b;
+      }
+    }
+  }
+  return res;
+}
+
+Binding full_match_with( Environment env, char* full_type )
+{
+  Binding res = NoBinding;
+  for (Binding b= DefinitionsOf(env); b; b=NextDefinition(b))
+  {
+    const char* cand_name = StringTable(IdnOf(b));
+    if (0 == strcmp(cand_name, full_type))
+    {
+      return b;
+    }
+  }
+  return res;
+}
 
 ~}
