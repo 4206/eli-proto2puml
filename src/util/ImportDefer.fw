@@ -59,6 +59,7 @@ IncludeDir "-I" "--include=" joinedto strings "Include directory imports";
 
 //#define PDEBUG(X) X
 #define PDEBUG(X) 
+#define PDEBUG2(X)
 
 typedef struct ImportRequest {
   int visited;
@@ -73,7 +74,7 @@ char** import_dirs;
 int n_import_dirs;
 
 // forward declarations
-int absolutify_include_paths(DefTableKeyList includeDir, char** idirs);
+char** absolutify_include_paths(DefTableKeyList includeDir, int* ndirs);
 const char* find_in_include_path(const char* filename, char** idirs, int ndirs);
 
 void init_import_requests()
@@ -87,7 +88,7 @@ void init_import_requests()
     start->next = 0;
     import_requests = start;
 
-    n_import_dirs = absolutify_include_paths(IncludeDir, import_dirs);
+    import_dirs = absolutify_include_paths(IncludeDir, &n_import_dirs);
   }
 }
 
@@ -122,13 +123,13 @@ void DeferInput(char* filename)
   // TODO: store CWD
   char cwd[1024]; // limited by os
   getcwd(cwd, sizeof(cwd));
-  fprintf(stderr,"Working dir of process: %s\n", cwd);
+  PDEBUG2(fprintf(stderr,"Working dir of process: %s\n", cwd));
   // TODO: get directory of currently included file
 
   const char* included_by = MapFile(LineNum);
-  fprintf(stderr,"included by '%s'\n", included_by);
+  PDEBUG2(fprintf(stderr,"included by '%s'\n", included_by));
 
-  fprintf(stderr,"filename '%s'\n",trimmed);
+  PDEBUG2(fprintf(stderr,"filename '%s'\n",trimmed));
   
 
   // build absolute path and locate file
@@ -136,25 +137,25 @@ void DeferInput(char* filename)
   if (0 != stat(trimmed, &st))
   {
     // file exists
-    fprintf(stderr, "file is NOT present in cwd\n");
+    PDEBUG2(fprintf(stderr, "file is NOT present in cwd\n"));
 
     const char* abs_path = find_in_include_path(trimmed, import_dirs, n_import_dirs);
     if (0 == abs_path)
     {
-      fprintf(stderr, "file is NOT present in include path\n");      
+      PDEBUG2(fprintf(stderr, "file is NOT present in include path\n"));
     }
     else
     {
-      fprintf(stderr, "file found at '%s'\n", abs_path);
+      PDEBUG2(fprintf(stderr, "file found at '%s'\n", abs_path));
     }
 
   }
   else
   {
-    fprintf(stderr, "file is present\n");
+    PDEBUG2(fprintf(stderr, "file is present\n"));
   }
 
-  fprintf(stderr,"\n");
+  PDEBUG2(fprintf(stderr,"\n"));
 
   //fprintf(stderr,"LineNum=%d, MapFile=%s\n", LineNum, included_by);
   // TODO: strip filename at the end
@@ -224,11 +225,10 @@ const char* NextImport()
 /** returns the number of IncludeDir's
  *  after call, idirs points to an array of strings storing the absolute include paths
  */
-int absolutify_include_paths(DefTableKeyList includeDir, char** idirs)
+char** absolutify_include_paths(DefTableKeyList includeDir, int* ndirs)
 {
-  int res = LengthDefTableKeyList(IncludeDir);
-  idirs = (char**)malloc(res*sizeof(char*)); // allocate array (not the strings within)
-
+  *ndirs = LengthDefTableKeyList(IncludeDir);
+  char** idirs = (char**)malloc(*ndirs*sizeof(char*)); // allocate array (not the strings within)
   // get cwd
   char cwd[1024]; // limited by os
   getcwd(cwd, sizeof(cwd));
@@ -245,23 +245,20 @@ int absolutify_include_paths(DefTableKeyList includeDir, char** idirs)
     snprintf(abs_path, abs_len, "%s/%s", cwd, include_path); // concat and write to buffer
     idirs[i] = abs_path;                            // link buffer to array
   }
-  return res;
+  return idirs;
 }
 
 const char* find_in_include_path(const char* suf_path, char** idirs, int ndirs)
 {
   int suf_len = strlen(suf_path);
-fprintf(stderr,"1\n");
   char* pre_path;
   int pre_len, abs_len;
   //for (DefTableKeyList list= IncludeDir; list; list= TailDefTableKeyList(list))
   for (int i=0; i<ndirs; i++)
   {
-fprintf(stderr,"2\n");
     // build absolute path
     //pre_path = StringTable(GetClpValue(HeadDefTableKeyList(list), 0));
     pre_path = idirs[i];
-fprintf(stderr,"21\n");
     pre_len = strlen(pre_path);
     abs_len = pre_len + suf_len + 2; // +1 for separator, +1 for 0-terminator
     char abs_path[abs_len];          // allocate on stack
@@ -271,7 +268,7 @@ fprintf(stderr,"21\n");
     { fprintf(stderr, "Failed to compose path %s/%s\n", pre_path, suf_path );
       continue;
     }
-fprintf(stderr,"4\n");
+
     // check if file exists
     struct stat st;
     if (0 != stat(abs_path, &st)) continue;
@@ -340,7 +337,7 @@ char *auxEOF(start, length) char *start; int length;
 #endif
 {
   const char* name = NextImport(); // return value 0 signals end-of-queue
-  fprintf(stderr, "OPEN %s\n",name);
+  PDEBUG2(fprintf(stderr, "OPEN %s\n",name));
   if (name == 0) return start;
 
   int descr;
