@@ -21,6 +21,8 @@ EnumItem: [PtgOutId $1 int]
 
 /* e.g. AddressBook o-- Person : repeated, formerly: PTGLink */
 RelationUsing: $1 " o-- " $2 " : " $3
+/* e.g. Response +-- Body*/
+RelationSubclass: $1 " +-- " $2
 
 /* Newline sequence with optional arguments */
 NlSeq: $1 {[IndentNewLine]} $2

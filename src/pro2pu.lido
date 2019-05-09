@@ -31,10 +31,13 @@
 CHAIN puml_ptg_chn: PTGNode;             /* collect message / enum decls */
 CHAIN puml_fields_ptg_chn: PTGNode;      /* collect fields within decls */
 CHAIN puml_relations_ptg_chn: PTGNode;   /* collect nesting relations */ 
+CHAIN puml_relations_ptg_chn2: PTGNode;   /* collect nesting relations */ 
 CHAIN custom_types_env_chn: Environment; /* collect type names */
 CHAIN qualified_classname_ptg_chn: PTGNode; /* pass down segments for qualified pathname */
+CHAIN qualified_classname_sym_chn: int;  /* segments for qualified pathname */
 
 CLASS SYMBOL ROOTCLASS: no: int SYNT;
+CLASS SYMBOL ROOTCLASS: ptgnull: PTGNode SYNT;
 CLASS SYMBOL ROOTCLASS: custom_types: Environment SYNT;
 CLASS SYMBOL ROOTCLASS COMPUTE
 
@@ -42,17 +45,25 @@ CLASS SYMBOL ROOTCLASS COMPUTE
   CHAINSTART HEAD.puml_ptg_chn = PTGNULL;
   CHAINSTART HEAD.puml_fields_ptg_chn = PTGNULL;
   CHAINSTART HEAD.puml_relations_ptg_chn = PTGNULL;
+  CHAINSTART HEAD.puml_relations_ptg_chn2 = PTGNULL;
   /* print collected uml lines */
   PTGOut(
     PTGPUML(
-      PTGNlSeq( TAIL.puml_ptg_chn, TAIL.puml_relations_ptg_chn )
+      PTGNlSeq( TAIL.puml_ptg_chn, PTGNlSeq( TAIL.puml_relations_ptg_chn, TAIL.puml_relations_ptg_chn2 ) )
   ));
+
+  %// each of those will segfault
+  /*PTGOut( CONSTITUENTS contributesRelation.contrib_relation_ptg WITH (PTGNode,PTGNlSeq,IDENTICAL,ZERO) );*/
+  /*PTGOut( CONSTITUENTS contributesField.field_relation_ptg WITH (PTGNode,PTGNlSeq,IDENTICAL,ZERO) );*/
+  /*PTGOut( CONSTITUENTS contributesSubclass.subclass_relation_ptg WITH (PTGNode,PTGNlSeq,IDENTICAL,ZERO) );*/
+
 
   /** TODO: collect full qualified path instead of just the name */
   CHAINSTART HEAD.custom_types_env_chn = NewEnv();
   SYNT.custom_types = TAIL.custom_types_env_chn;
 
   SYNT.no = 0;
+  SYNT.ptgnull = PTGNULL;
 
   /*dump_env_keys(THIS.custom_types);*/
 END;
@@ -60,7 +71,7 @@ END;
 SYMBOL ProtoDoc: package_name: int SYNT;
 SYMBOL ProtoDoc COMPUTE
   SYNT.puml_ptg_chn = PTGNlSeq(THIS.puml_ptg_chn,
-                      PTGNlSeq(PTGSourceFile(MapFile(LineNum)),
+                      PTGNlSeq(PTGSourceFile(MapFile(LineNum)), /* TODO: this is broken */
                       PTGNlSeq(%// wrap into package only if there is a package name given
                                IF ( THIS.package_name %// is not null
                                   , PTGPackage( CONSTITUENTS Package.name WITH (int,ior_package,IDENTICAL,ZERO)
@@ -79,6 +90,7 @@ SYMBOL ProtoDoc COMPUTE
 
   %// hand down type qualifier, start with package name
   CHAINSTART HEAD.qualified_classname_ptg_chn = IF( THIS.package_name, PTGId(THIS.package_name), PTGNULL );
+  CHAINSTART HEAD.qualified_classname_sym_chn = THIS.package_name;
 END;
 
 CLASS SYMBOL hasName: name: int SYNT;
@@ -101,21 +113,33 @@ END;
 
 CLASS SYMBOL qualifiedName: yes: int SYNT;
 CLASS SYMBOL qualifiedName: qualified_name_ptg: PTGNode SYNT;
+CLASS SYMBOL qualifiedName: qualified_name_sym: int SYNT;
+CLASS SYMBOL qualifiedName: subclass_relation_ptg: PTGNode SYNT;
 CLASS SYMBOL qualifiedName COMPUTE
   /*SYNT.qualified_name_ptg = PTGDotSeq(THIS.qualified_classname_ptg_chn, PTGId(THIS.name));*/
   %// plantuml can handle only 1 hierarchy level; nested messages/classes are prefixed with $
   %// to identify nesting depth, look upwards the hierarchy, if we're already inside a message or enum
   %// only the classname at the lowest level (THIS.name) is used for display
   SYNT.qualified_name_ptg = PTGSeq3(THIS.qualified_classname_ptg_chn
-                                   , IF( INCLUDING (qualifiedName.yes, ROOTCLASS.no)
+                                   , IF( INCLUDING (qualifiedName.yes, Extend.yes, ROOTCLASS.no)
                                        , PTGAsIs("$")
                                        , PTGAsIs("."))
                                    , PTGId(THIS.name));
 
+  SYNT.qualified_name_sym = concat_id_with_dot( THIS.qualified_classname_sym_chn, THIS.name );
+
   %// refine class scope (although plantuml can handle only 1 level of scopes, we just hide the hierarchy)
-  HEAD.qualified_classname_ptg_chn = THIS.qualified_name_ptg;
+  HEAD.qualified_classname_ptg_chn = THIS.qualified_name_ptg;          %// pass down
   SYNT.qualified_classname_ptg_chn = THIS.qualified_classname_ptg_chn; %// bridge
 
+  HEAD.qualified_classname_sym_chn = THIS.qualified_name_sym;          %// pass down
+  SYNT.qualified_classname_sym_chn = THIS.qualified_classname_sym_chn; %// bridge
+
+  %// add link for subclassing relation
+  SYNT.subclass_relation_ptg = IF( INCLUDING (qualifiedName.yes, Extend.yes, ROOTCLASS.no)
+                                 , PTGRelationSubclass(INCLUDING (qualifiedName.qualified_name_ptg, Extend.qualified_name_ptg, ROOTCLASS.ptgnull), THIS.qualified_name_ptg)
+                                 , PTGNULL );
+  
   SYNT.yes = 1;
 END;
 
@@ -123,19 +147,34 @@ SYMBOL Message INHERITS qualifiedName END;
 SYMBOL Enum    INHERITS qualifiedName END;
 /* SYMBOL Extend  INHERITS qualifiedName END; /* TODO: some Eli error with overrides not recognized? */
 
+SYMBOL Extend: yes: int SYNT;
 SYMBOL Extend: qualified_name_ptg: PTGNode SYNT;
+SYMBOL Extend: qualified_name_sym: int SYNT;
+SYMBOL Extend: subclass_relation_ptg: PTGNode SYNT;
 SYMBOL Extend COMPUTE
   /* must override in SYMBOL, not in RULE -- this workaround doesnt really work either */
   /*SYNT.qualified_name_ptg = PTGDotSeq(THIS.qualified_classname_ptg_chn, PTGId(THIS.messageType));*/
   SYNT.qualified_name_ptg = PTGSeq3(THIS.qualified_classname_ptg_chn
-                                   , IF( INCLUDING (qualifiedName.yes, ROOTCLASS.no)
+                                   , IF( INCLUDING (qualifiedName.yes, Extend.yes, ROOTCLASS.no)
                                        , PTGAsIs("$")
                                        , PTGAsIs("."))
                                    , PTGId(THIS.messageType));
 
+  SYNT.qualified_name_sym = concat_id_with_dot( THIS.qualified_classname_sym_chn, THIS.messageType );
+
   %// refine class scope (although plantuml can handle only 1 level of scopes, we just hide the hierarchy)
-  HEAD.qualified_classname_ptg_chn = THIS.qualified_name_ptg;
+  HEAD.qualified_classname_ptg_chn = THIS.qualified_name_ptg;          %// pass down
   SYNT.qualified_classname_ptg_chn = THIS.qualified_classname_ptg_chn; %// bridge
+
+  HEAD.qualified_classname_sym_chn = THIS.qualified_name_sym;          %// pass down
+  SYNT.qualified_classname_sym_chn = THIS.qualified_classname_sym_chn; %// bridge
+
+  %// add link for subclassing relation
+  SYNT.subclass_relation_ptg = IF( INCLUDING (qualifiedName.yes, Extend.yes, ROOTCLASS.no)
+                                 , PTGRelationSubclass(INCLUDING (qualifiedName.qualified_name_ptg, Extend.qualified_name_ptg, ROOTCLASS.ptgnull), THIS.qualified_name_ptg)
+                                 , PTGNULL );
+  
+  SYNT.yes = 1;
 END;
 
 /*PTGOut(PTGKRDebug(QUALNAME_PTG,IDN))*/
@@ -158,11 +197,11 @@ CLASS SYMBOL TypeDef COMPUTE
 
 
 /* TODO: report coords of previous definition */
-#define CHK_TYPE(ENV, PKG_IDN, T_IDN)\
+#define CHK_TYPE1(ENV, PKG_IDN, T_IDN)\
   IF( BindingInScope(GetPackageNameCandidates(KeyOf(BindingInScope(ENV, T_IDN)),NoEnv), PKG_IDN )\
      , ORDER( ReportF(WARNING,COORDREF,"type '%s' already defined in package '%s'", StringTable(T_IDN), StringTable(PKG_IDN)), 0)\
      , 1 )
-#define DEF_TYPE(ENV, PKG_IDN, T_IDN)\
+#define DEF_TYPE1(ENV, PKG_IDN, T_IDN)\
   ORDER(1\
    /* register unqualified typename as key */\
   ,BindIdn(ENV,T_IDN)\
@@ -170,18 +209,29 @@ CLASS SYMBOL TypeDef COMPUTE
   ,UniquePackageNameCandidates(KeyInScope(ENV, T_IDN),NewEnv)\
    /* register package name into dictionary */\
   ,BindKey(GetPackageNameCandidates(KeyOf(BindingInScope(ENV, T_IDN)),NoEnv),PKG_IDN, THIS.def_key)\
-  /*,BindIdn(GetPackageNameCandidates(KeyInScope(ENV, T_IDN),NoEnv),PKG_IDN)\
+  /* TODO */\
+  /*,BindIdn(GetPackageNameCandidates(KeyInScope(ENV, T_IDN),NoEnv),PKG_IDN)*/\
   /* ensure that a list of candidates per typename_x_packagename is initialized */\
-  /*,UniqueTypeInstCandidates(KeyInScope(GetPackageNameCandidates(KeyInScope(ENV, T_IDN),NoEnv),PKG_IDN),NullTYPEList)\
+  /*,UniqueTypeInstCandidates(KeyInScope(GetPackageNameCandidates(KeyInScope(ENV, T_IDN),NoEnv),PKG_IDN),NullTYPEList)*/\
   /* insert key into type inst candidate list */\
   /*,AppElDefTableKeyList()*/\
+  ,ENV)
+
+#define CHK_TYPE(ENV, PKG_IDN, T_IDN)\
+  IF( BindingInScope(ENV, THIS.qualified_name_sym)\
+    , ORDER( ReportF(WARNING,COORDREF,"type '%s' already defined in package '%s' (%s)", StringTable(T_IDN), StringTable(PKG_IDN),StringTable(THIS.qualified_name_sym)), 0)\
+    , 1 )
+
+#define DEF_TYPE(ENV, PKG_IDN, T_IDN)\
+  ORDER(1\
+  ,BindKey(ENV, THIS.qualified_name_sym, THIS.def_key)\
   ,ENV)
   
   HEAD.custom_types_env_chn = IF( CHK_TYPE(THIS.custom_types_env_chn, INCLUDING ProtoDoc.package_name, THIS.name )
                                 , DEF_TYPE(THIS.custom_types_env_chn, INCLUDING ProtoDoc.package_name, THIS.name )
                                 , THIS.custom_types_env_chn );
-#undef DEF_TYPE
-#undef CHK_TYPE
+#undef DEF_TYPE1
+#undef CHK_TYPE1
 
   
 
@@ -258,24 +308,53 @@ RULE rExtend: Extend ::= MessageType ExtendBody COMPUTE
   Extend.messageType = MessageType.sym;
 END;
 
+%// root class for contributions to chain puml_relations_ptg_chn
+CLASS SYMBOL contributesRelation: field_relation_ptg:    PTGNode SYNT;  %// is PTGNULL if type is primitve
+/*CLASS SYMBOL contributesRelation: subclass_relation_ptg: PTGNode SYNT;*/
+CLASS SYMBOL contributesRelation: contrib_relation_ptg:  PTGNode SYNT;
+CLASS SYMBOL contributesRelation COMPUTE
+  SYNT.puml_relations_ptg_chn =
+    PTGNlSeq(TAIL.puml_relations_ptg_chn, THIS.contrib_relation_ptg );
+    /*PTGNlSeq(THIS.field_relation_ptg,
+             THIS.subclass_relation_ptg));*/
 
+  SYNT.contrib_relation_ptg = PTGNlSeq(THIS.field_relation_ptg, PTGNULL /*THIS.subclass_relation_ptg*/);
+  /*PTGOut(PTGNlSeq(THIS.contrib_relation_ptg,PTGAsIs("")));*/
+    
+  /*  PTGOut(PTGNlSeq(THIS.field_relation_ptg,PTGAsIs("")));
+    PTGOut(PTGNlSeq(THIS.subclass_relation_ptg,PTGAsIs("")));
+  */
+  
+  %// default contributions
+  SYNT.field_relation_ptg = PTGAsIs("none");
+  /*SYNT.subclass_relation_ptg = PTGAsIs("noneclass");*/
 
+END;
+
+CLASS SYMBOL contributesField INHERITS contributesRelation END; %// can't have multiple inheritance
 CLASS SYMBOL contributesField: field_ptg: PTGNode SYNT;
-CLASS SYMBOL contributesField: field_relation_ptg: PTGNode SYNT; %// is PTGNULL if type is primitve
+CLASS SYMBOL contributesField: field_relation_ptg: PTGNode SYNT; %// redundant
 CLASS SYMBOL contributesField COMPUTE
   %// contribution to chain
-  SYNT.puml_fields_ptg_chn =
-    PTGNlSeq(THIS.puml_fields_ptg_chn, THIS.field_ptg);
-
   %// add a type relation of parent uses fieldtype
-  SYNT.puml_relations_ptg_chn =
-    PTGNlSeq(THIS.puml_relations_ptg_chn, THIS.field_relation_ptg);
+  SYNT.puml_fields_ptg_chn =
+    PTGNlSeq(TAIL.puml_fields_ptg_chn, THIS.field_ptg);
 END;
 
 SYMBOL Field INHERITS contributesField END;
 SYMBOL Map   INHERITS contributesField END;
 SYMBOL OneOf INHERITS contributesField END;
 %// OneOfField does NOT INHERITS contributesField, because OneOf forms a wrapper around it
+
+
+CLASS SYMBOL contributesSubclass /*INHERITS contributesRelation*/ END; %// can't have multiple inheritance
+CLASS SYMBOL contributesSubclass: subclass_relation_ptg: PTGNode SYNT; %// redundant
+CLASS SYMBOL contributesSubclass COMPUTE 
+  SYNT.puml_relations_ptg_chn2 = PTGNlSeq(TAIL.puml_relations_ptg_chn2, THIS.subclass_relation_ptg ); %// here only TAIL compiles to _post, THIS compiles to _pre
+END;
+
+CLASS SYMBOL qualifiedName INHERITS contributesSubclass END;
+      SYMBOL Extend        INHERITS contributesSubclass END;
 
 %// get qualfied name; if none found, default to key as type
 %// TODO: recognized already-qualified names being used as keys
@@ -292,7 +371,7 @@ RULE rField: Field ::= Label FieldType FieldName FieldNumber FieldOptions COMPUT
   Field.field_ptg = PTGField(FieldName.sym, FieldType.sym, PTGId(Label.sym));
 
   %// TODO: do something with Field default in optional fields ?
-  % // Field.field_ptg = PTGFieldWithDefault(FieldName.sym, FieldType.sym, PTGAsIs("optional"), FieldDefault.sym);
+  %// Field.field_ptg = PTGFieldWithDefault(FieldName.sym, FieldType.sym, PTGAsIs("optional"), FieldDefault.sym);
 
   %// collect use-def relations between fields and message/enum/group definitions
   %// no name analysis carried out; we assume that FieldType.sym is defined
@@ -434,6 +513,25 @@ CLASS SYMBOL TypeUse COMPUTE
   %// with each package considered to be "inner" to its parent package.
   %// A leading '.' (for example, .foo.bar.Baz) means to start from the outermost scope instead.
 
+  /* example lookup "X.Y":
+   * if current class is Package.Subpackage.Class.Subclass
+   * 1. search for Package.Subpackage.Class.Subclass.X.Y
+   * 2. search for Package.Subpackage.Class.X.Y
+   * 3. search for Package.Subpackage.X.Y
+   * 4. search for Package.X.Y
+   * 5. search for X.Y
+   *
+   * example lookup ".X.Y":
+   * if current class is Package.Subpackage.Class.Subclass
+   * 1. search for X.Y
+   * 2. search for Package.X.Y
+   * 3. search for Package.Subpackage.X.Y
+   * 4. search for Package.Subpackage.Class.X.Y
+   * 5. search for Package.Subpackage.Class.Subclass.X.Y
+   *
+   * THIS.sym may contain dots, even a leading dot
+   */
+  SYNT.custom_type_key = IF( THIS.is_custom, KeyOf(lookup_class_in_typedict( INCLUDING ROOTCLASS.custom_types, THIS.qualified_classname_sym_chn, THIS.sym )), NoKey);
 
   %// every non-primitive type (i.e. synthesized from ident, not from PrimitiveType) is custom
   SYNT.is_custom = CONSTITUENTS ident.sym WITH (int,ADD,IDENTICAL,ZERO);
@@ -469,6 +567,7 @@ H(G(F(A,B),C),D)
   %// 2. lookup by package name (e.g. "Package.Subpackage" in Package.Subpackage.Body )
   %// 3. lookup by inner class hierarchy (e.g. "Request" in Pack.Sub.Request$Body )
   /*SYNT.custom_type_key = KeyOf(BindingInEnv(INCLUDING ROOTCLASS.custom_types, THIS.sym));*/
+  /*
   SYNT.custom_type_key =  KeyInScope(
                             GetPackageNameCandidates(
                               KeyInScope(
@@ -476,6 +575,7 @@ H(G(F(A,B),C),D)
                               , THIS.type_basename)
                             , NoEnv)
                           , THIS.type_package);
+  */
 /*
 #define APP1(S,F,FA)                     F(FA,S)
 #define APP2(S,F,FA,G,GA)           G(GA,F(FA,S))
@@ -510,7 +610,7 @@ soll: H(C,G(B,F(A,A0)))
 
 
   %// warn in specific use siutations
-  %//IF( THIS.custom_types_key, 0, ReportF(WARNING,COORDREF,"unresolved type '%s'", StringTable(THIS.sym)) );
+  %//IF( THIS.custom_type_key, 0, ReportF(WARNING,COORDREF,"unresolved type '%s'", StringTable(THIS.sym)) );
 
 END;
 

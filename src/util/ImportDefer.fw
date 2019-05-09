@@ -55,6 +55,8 @@ IncludeDir "-I" "--include=" joinedto strings "Include directory imports";
 // import LineNum
 #include "err.h"
 
+#include <sys/stat.h>
+
 //#define PDEBUG(X) X
 #define PDEBUG(X) 
 
@@ -67,6 +69,13 @@ typedef struct ImportRequest {
 /** static field **/
 ImportRequest* import_requests = 0;
 
+char** import_dirs;
+int n_import_dirs;
+
+// forward declarations
+int absolutify_include_paths(DefTableKeyList includeDir, char** idirs);
+const char* find_in_include_path(const char* filename, char** idirs, int ndirs);
+
 void init_import_requests()
 {
   if (!import_requests)
@@ -77,8 +86,11 @@ void init_import_requests()
     start->filename = StringTable(GetClpValue(CLP_InputFile,0)); // note: StringTable(1) does not work with subdirectories!
     start->next = 0;
     import_requests = start;
+
+    n_import_dirs = absolutify_include_paths(IncludeDir, import_dirs);
   }
 }
+
 
 /** DeferInput collects filenames in the parser
  * (call '&DeferInput();' within a .con rule.
@@ -92,8 +104,6 @@ void DeferInput(char* filename)
 
   // check if queue is initialized
   init_import_requests();
-  
-  // TODO: check if filename exists
 
   // trim quotes
   int len = strlen(filename);
@@ -102,7 +112,7 @@ void DeferInput(char* filename)
   // trim double quote characters around the filename
   char* trimmed;
   if (filename[0] == '"' && filename[len-1] == '"')
-  { trimmed = (char*)malloc(len-1); // trim by 2, add 1 byte for terminator
+  { trimmed = (char*)malloc((len-1)*sizeof(char)); // trim by 2, add 1 byte for terminator
     strncpy(trimmed, filename+1, len-2);
     trimmed[len-2] = 0;
   }
@@ -112,11 +122,41 @@ void DeferInput(char* filename)
   // TODO: store CWD
   char cwd[1024]; // limited by os
   getcwd(cwd, sizeof(cwd));
-  //printf("Working dir of process: %s\n", cwd);
+  fprintf(stderr,"Working dir of process: %s\n", cwd);
   // TODO: get directory of currently included file
 
   const char* included_by = MapFile(LineNum);
-  //printf("LineNum=%d, MapFile=%s\n", LineNum, included_by);
+  fprintf(stderr,"included by '%s'\n", included_by);
+
+  fprintf(stderr,"filename '%s'\n",trimmed);
+  
+
+  // build absolute path and locate file
+  struct stat st;
+  if (0 != stat(trimmed, &st))
+  {
+    // file exists
+    fprintf(stderr, "file is NOT present in cwd\n");
+
+    const char* abs_path = find_in_include_path(trimmed, import_dirs, n_import_dirs);
+    if (0 == abs_path)
+    {
+      fprintf(stderr, "file is NOT present in include path\n");      
+    }
+    else
+    {
+      fprintf(stderr, "file found at '%s'\n", abs_path);
+    }
+
+  }
+  else
+  {
+    fprintf(stderr, "file is present\n");
+  }
+
+  fprintf(stderr,"\n");
+
+  //fprintf(stderr,"LineNum=%d, MapFile=%s\n", LineNum, included_by);
   // TODO: strip filename at the end
   // TODO: prepend cwd
   // TODO: store with queue request
@@ -126,7 +166,7 @@ void DeferInput(char* filename)
   for (; r; r=r->next)
   { 
     if (0 == strcmp(trimmed, r->filename))
-    { return; }  // skip already requested files
+    { return; }  // skip files already requested
 
     if (! r->next) break; // advance pointer only until last valid element
   }
@@ -181,6 +221,70 @@ const char* NextImport()
   return 0;
 }
 
+/** returns the number of IncludeDir's
+ *  after call, idirs points to an array of strings storing the absolute include paths
+ */
+int absolutify_include_paths(DefTableKeyList includeDir, char** idirs)
+{
+  int res = LengthDefTableKeyList(IncludeDir);
+  idirs = (char**)malloc(res*sizeof(char*)); // allocate array (not the strings within)
+
+  // get cwd
+  char cwd[1024]; // limited by os
+  getcwd(cwd, sizeof(cwd));
+  int cwd_len = strlen(cwd);
+
+  char* include_path, *abs_path;
+  int abs_len;
+  int i = 0;
+  for (DefTableKeyList list= includeDir; list; list= TailDefTableKeyList(list), i++)
+  {
+    include_path = StringTable(GetClpValue(HeadDefTableKeyList(list), 0));
+    abs_len = cwd_len + strlen(include_path) + 2;   // +1 separator, +1 terminator
+    abs_path = (char*)malloc(abs_len*sizeof(char)); // allocate ith buffer
+    snprintf(abs_path, abs_len, "%s/%s", cwd, include_path); // concat and write to buffer
+    idirs[i] = abs_path;                            // link buffer to array
+  }
+  return res;
+}
+
+const char* find_in_include_path(const char* suf_path, char** idirs, int ndirs)
+{
+  int suf_len = strlen(suf_path);
+fprintf(stderr,"1\n");
+  char* pre_path;
+  int pre_len, abs_len;
+  //for (DefTableKeyList list= IncludeDir; list; list= TailDefTableKeyList(list))
+  for (int i=0; i<ndirs; i++)
+  {
+fprintf(stderr,"2\n");
+    // build absolute path
+    //pre_path = StringTable(GetClpValue(HeadDefTableKeyList(list), 0));
+    pre_path = idirs[i];
+fprintf(stderr,"21\n");
+    pre_len = strlen(pre_path);
+    abs_len = pre_len + suf_len + 2; // +1 for separator, +1 for 0-terminator
+    char abs_path[abs_len];          // allocate on stack
+    int byteswritten = snprintf( abs_path, abs_len, "%s/%s", pre_path, suf_path ); 
+    // check if snprintf succeeded
+    if (byteswritten + 1 != abs_len)
+    { fprintf(stderr, "Failed to compose path %s/%s\n", pre_path, suf_path );
+      continue;
+    }
+fprintf(stderr,"4\n");
+    // check if file exists
+    struct stat st;
+    if (0 != stat(abs_path, &st)) continue;
+    
+    // file exists, allocate result on heap
+    char* res = (char*)malloc(abs_len*sizeof(char));
+    res[0] = 0; // initialize buffer terminator for strncat
+    return strncat( res, abs_path, abs_len );
+  }
+  return 0;  
+}
+
+
 int try_open(const char *path, int oflags)
 {
   int descr;
@@ -204,7 +308,7 @@ int try_open(const char *path, int oflags)
     pre_path = StringTable(GetClpValue(HeadDefTableKeyList(list), 0));
     prefix_len = strlen(pre_path);
     full_len = prefix_len + path_len + 2;
-    full_path = (char*)malloc(full_len); // add separator and terminator
+    full_path = (char*)malloc(full_len*sizeof(char)); // add separator and terminator
     int byteswritten = snprintf(full_path, full_len, "%s/%s", pre_path, path);
     if (byteswritten + 1 != full_len)
     { fprintf(stderr, "Failed to allocate path %s/%s\n", pre_path, path);
@@ -236,6 +340,7 @@ char *auxEOF(start, length) char *start; int length;
 #endif
 {
   const char* name = NextImport(); // return value 0 signals end-of-queue
+  fprintf(stderr, "OPEN %s\n",name);
   if (name == 0) return start;
 
   int descr;

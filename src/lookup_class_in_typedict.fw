@@ -1,0 +1,229 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+~O~<lookup_class_in_typedict.head~>==~{
+#include "lookup_class_in_typedict.h"
+
+~}
+
+~O~<lookup_class_in_typedict.h~>==~{
+#ifndef LOOKUP_CLASS_IN_TYPEDICT
+#define LOOKUP_CLASS_IN_TYPEDICT
+
+#include "envmod.h"
+
+/** Classname may contain dots.
+ * If the classname starts with a dot, search will start top-down,
+ * otherwise default to bottom-up
+ *
+ * From the spec (https://developers.google.com/protocol-buffers/docs/proto#packages-and-name-resolution):
+ * Type name resolution in the protocol buffer language works like C++: 
+ * first the innermost scope is searched, then the next-innermost, and so on,
+ * with each package considered to be "inner" to its parent package.
+ * A leading '.' (for example, .foo.bar.Baz) means to start from the outermost scope instead.
+ *
+ * example lookup "X.Y":
+ * if current class is Package.Subpackage.Class.Subclass
+ * 1. search for Package.Subpackage.Class.Subclass.X.Y
+ * 2. search for Package.Subpackage.Class.X.Y
+ * 3. search for Package.Subpackage.X.Y
+ * 4. search for Package.X.Y
+ * 5. search for X.Y
+ *
+ * example lookup ".X.Y":
+ * if current class is Package.Subpackage.Class.Subclass
+ * 1. search for X.Y
+ * 2. search for Package.X.Y
+ * 3. search for Package.Subpackage.X.Y
+ * 4. search for Package.Subpackage.Class.X.Y
+ * 5. search for Package.Subpackage.Class.Subclass.X.Y
+ *
+ */
+extern Binding lookup_class_in_typedict( Environment env, int path, int classname );
+
+#endif // LOOKUP_CLASS_IN_TYPEDICT
+
+~}
+
+~O~<lookup_class_in_typedict.c~>==~{
+#include "lookup_class_in_typedict.h"
+#include <stdio.h>
+#include "csm.h" // extern char* StringTable( int i )
+
+/* count occurrences of a separator within a string */
+int cntchr(const char s[], const char sep)
+{
+  int /*size_t*/ i = 0;
+  for (i=0; s[i]; s[i]==sep ? i++ : *s++);
+  return i;
+}
+
+/* return bool */
+int startswith(const char* str, const char* prefix)
+{
+  int pre_len = strlen(prefix);
+//fprintf(stderr,"startswith(%s,%s) == %d\n",str,prefix,strncmp(str, prefix, pre_len));
+  return 0 == strncmp(str, prefix, pre_len);
+}
+
+/* return bool */
+int endswith(const char* str, const char* suffix)
+{
+  int suf_len = strlen(suffix);
+  if (suf_len > strlen(str)) return 0; // return false
+//fprintf(stderr,"endswith(%s,%s) == %d via %s\n",str,suffix,strncmp(str-suf_len-1, suffix, suf_len),str-suf_len-1);
+  return 0 == strncmp(str-suf_len-1, suffix, suf_len);
+}
+
+/* res must have capacity allocated to contain all segments from segs */
+char* concat_n(char* buf, char** segs, char* sep, int nsegs)
+{
+  buf[0] = 0;
+  int i;
+  for (i=0;i<nsegs;i++)
+  {
+    strcat(buf, segs[i]);
+    strcat(buf, sep);      // prefix can always end with a dot
+    //if (i<nsegs-1) { strcat(buf, sep); }
+  }
+//fprintf(stderr,"%d: %s\n", i, buf);
+
+  return buf;
+}
+
+Binding lookup_class_in_typedict( Environment env, int prefix, int suffix )
+{
+//fprintf(stderr,"pre=%s suf=%s\n",StringTable(prefix),StringTable(suffix));
+
+  if (suffix == 0) return NoBinding;
+
+  Binding res = NoBinding;
+
+  // split classname into segments
+
+  // search for all types that start with prefix and end with suffix
+  // depending on direction of refinement: shorten or extend prefix
+  // until exactly 1 match is found
+  // if multiple matches are found after shortening (extending) the prefix by 1 step, then the type dict is erroneous
+
+  char* pre_str = StringTable(prefix);
+  char* suf_str = StringTable(suffix);
+  char pre_buf[strlen(pre_str)+1]; // working buffer for prefix incremenets
+
+  // split prefix into segments along dot
+  int n_pre_segs = cntchr(pre_str , '.') + 1;
+  char* pre_seg[n_pre_segs];
+
+  char* delimiter = "."; 
+  char *ptr;
+  int i;
+  for( i=0, ptr = strtok(pre_str, delimiter); ptr != NULL; ptr = strtok(NULL, delimiter) )
+  { pre_seg[i++] = ptr; }
+ 
+
+  /* debug
+  fprintf(stderr,"found %d segsments\n",n_pre_segs);
+  for(int i=0;i<n_pre_segs;i++)
+  { fprintf(stderr,"-%s\n",pre_seg[i]); }
+  */
+
+ 
+  int nsegs_used;
+  int top_down;
+  if ( startswith(suf_str, ".") )
+  {
+    top_down = 1;   // reverse refinement direction
+    suf_str++;      // skip leading dot
+    pre_buf[0] = 0; // start with empty prefix INSIDE the space already allocated (for re-building it step-by-step)
+  }
+  else
+  {
+    top_down = 0;
+  }
+
+  
+  if (top_down)
+  {
+    for(nsegs_used = 0; nsegs_used <= n_pre_segs; nsegs_used++ )
+    {
+      // build a new prefix from the first n segments
+      /*pre_buf =*/ concat_n(pre_buf, pre_seg, ".", nsegs_used);
+
+      // search through all the fully qualified type names
+      for( Binding b=DefinitionsOf(env); b; b=NextDefinition(b))
+      {
+        const char* cand_name = StringTable(IdnOf(b));
+//fprintf(stderr,"cand=%s\n",cand_name);
+        if (startswith(cand_name, pre_buf) && endswith(cand_name, suf_str))
+        {
+          if ( res != NoBinding )
+          { 
+            fprintf(stderr,"Note: multiple matching types for '%s'~@'%s'\n", pre_buf, suf_str);
+            if (strlen(StringTable(IdnOf(b))) < strlen(StringTable(IdnOf(res)))) { res = b; } // shorter names are closer to the hierarchy level
+          }
+          else
+          { res = b; }
+        }
+      }
+      // abort if a matching type was found
+      if (res) return res;
+    }
+
+    // TODO
+    return NoBinding;
+  }
+  else
+  {
+    for(nsegs_used = n_pre_segs; nsegs_used >= 0; nsegs_used-- )
+    {
+      // build a new prefix from the first n segments
+      /*pre_buf =*/ concat_n(pre_buf, pre_seg, ".", nsegs_used);
+
+      // search through all the fully qualified type names
+      for( Binding b=DefinitionsOf(env); b; b=NextDefinition(b))
+      {
+        const char* cand_name = StringTable(IdnOf(b));
+//fprintf(stderr,"cand=%s\n",cand_name);
+        if (startswith(cand_name, pre_buf) && endswith(cand_name, suf_str))
+        {
+          if ( res != NoBinding )
+          {
+            //fprintf(stderr,"Note: multiple matching types for '%s'~@'%s'\n", pre_buf, suf_str);
+            if (strlen(StringTable(IdnOf(b))) < strlen(StringTable(IdnOf(res)))) { res = b; } // shorter names are closer to the hierarchy level
+          }
+          else
+          { res = b; }
+        }
+      }
+      // abort if a matching type was found
+      if (res) return res;
+    }
+    return NoBinding;
+  }
+
+  /*
+
+  char delimiter[] = "."; 
+  char *ptr;
+
+  int n_pre_segs = cntchr(pre_str , '.')+1;
+  int n_suf_segs = cntchr(suf_str, '.')+1;
+
+  char pre_seg[][n_pre_segs];
+  char suf_seg[][n_suf_segs];
+
+  // fill in segments
+  int i;
+  for( i=0, ptr = strtok(pre_str, delimiter); ptr != NULL; ptr = strtok(NULL, delimiter) )
+  { pre_seg[i] = ptr; }
+  for( i=0, ptr = strtok(suf_str, delimiter); ptr != NULL; ptr = strtok(NULL, delimiter) )
+  { suf_seg[i] = ptr; }
+
+  // TODO:
+  return NoKey;
+  */
+}
+
+
+~}

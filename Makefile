@@ -10,6 +10,7 @@ exe:
 	$(ELI) "$(SRC_DIR)/pro2pu.specs :exe > $(TRG_DIR)/pro2pu"
 
 source:
+	rm -rf $(TRG_DIR)/source
 	mkdir -p $(TRG_DIR)/source/
 	$(ELI) "$(SRC_DIR)/pro2pu.specs :source > $(TRG_DIR)/source/"	
 	cd $(TRG_DIR); tar cfz pro2pu-$(shell date +%Y-%m%d-%H%M).tar.gz source
@@ -61,7 +62,7 @@ INDEX.proto:
 
 
 INDEX.puml: $(TRG_DIR)/INDEX.proto
-	$(TRG_DIR)/pro2pu $(TRG_DIR)/INDEX.proto > $(TRG_DIR)/INDEX.puml
+	$(TRG_DIR)/pro2pu -Itest-interfaces-sorted  $(TRG_DIR)/INDEX.proto > $(TRG_DIR)/INDEX.puml
 INDEX.svg: $(TRG_DIR)/INDEX.puml
 	$(PUML) -tsvg $(TRG_DIR)/INDEX.puml
 
