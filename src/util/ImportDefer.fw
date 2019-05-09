@@ -9,6 +9,10 @@ Remembers visited files and does not include them again.
 Note: provides an overriding implementation of auxEOF,
 see auxEOF in: http://eli-project.sourceforge.net/elionline/lex_1.html#SEC8
 
+~O~<ImportDefer.specs~>==~{
+ropes.fw
+~}
+
 ~O~<ImportDefer.head~>==~{
 #include "ImportDefer.h"
 
@@ -57,9 +61,13 @@ IncludeDir "-I" "--include=" joinedto strings "Include directory imports";
 
 #include <sys/stat.h>
 
+#include "ropes.h"
+
 //#define PDEBUG(X) X
 #define PDEBUG(X) 
 #define PDEBUG2(X)
+
+#define CWD_BUFSIZE 1024
 
 typedef struct ImportRequest {
   int visited;
@@ -92,7 +100,6 @@ void init_import_requests()
   }
 }
 
-
 /** DeferInput collects filenames in the parser
  * (call '&DeferInput();' within a .con rule.
  * DeferInput must remember the cwd (current working directory),
@@ -113,63 +120,125 @@ void DeferInput(char* filename)
   // trim double quote characters around the filename
   char* trimmed;
   if (filename[0] == '"' && filename[len-1] == '"')
-  { trimmed = (char*)malloc((len-1)*sizeof(char)); // trim by 2, add 1 byte for terminator
+  { trimmed = (char*)malloc((len-1)*sizeof(char)); // -2 "" trim, +1 terminator
     strncpy(trimmed, filename+1, len-2);
     trimmed[len-2] = 0;
   }
   else
   { trimmed = filename; }
 
-  // TODO: store CWD
-  char cwd[1024]; // limited by os
-  getcwd(cwd, sizeof(cwd));
-  PDEBUG2(fprintf(stderr,"Working dir of process: %s\n", cwd));
-  // TODO: get directory of currently included file
-
-  const char* included_by = MapFile(LineNum);
-  PDEBUG2(fprintf(stderr,"included by '%s'\n", included_by));
-
-  PDEBUG2(fprintf(stderr,"filename '%s'\n",trimmed));
-  
-
-  // build absolute path and locate file
+  // locate file and build absolute path
+  // 1. if the filename is absolute, load it or fail
+  // 2. attempt to locate included file relative to including file
+  // 3. attempt to locate included file in cwd
+  // 4. attempt to locate included file in include dir
   struct stat st;
-  if (0 != stat(trimmed, &st))
+  char* abs_path;
+  do 
   {
-    // file exists
-    PDEBUG2(fprintf(stderr, "file is NOT present in cwd\n"));
-
-    const char* abs_path = find_in_include_path(trimmed, import_dirs, n_import_dirs);
-    if (0 == abs_path)
+    // 1. check if file is absolute
+    if (startswith(trimmed, "/"))
     {
-      PDEBUG2(fprintf(stderr, "file is NOT present in include path\n"));
+      if (0 == stat(trimmed, &st)) // on success, 0 is returned
+      {
+        abs_path = trimmed;
+        break; // goto end
+      }
+      else
+      { 
+        fprintf(stderr, "Warning: absolute include file not found: %s\n", trimmed);
+        return; // skip further checks
+      }
     }
-    else
+
+
+    // 2. check if file is in path relative to including file
+    const char* included_by_file = MapFile(LineNum);  
     {
-      PDEBUG2(fprintf(stderr, "file found at '%s'\n", abs_path));
+      // 2.1 make included-by path absolute
+      char* included_by_path;
+      if (startswith(included_by_file, "/"))
+      {
+        int inc_len = strlen(included_by_file);
+        included_by_path = (char*)malloc(inc_len*sizeof(char));
+        strncpy( included_by_path, included_by_file, inc_len );
+      }
+      else
+      {
+        char cwd[CWD_BUFSIZE];
+        getcwd(cwd, sizeof(cwd));
+        int cwd_len = strlen(cwd);
+        int inc_len = cwd_len + strlen(included_by_file) + 2; // +1 sep, +1 term
+        included_by_path = (char*)malloc(inc_len*sizeof(char));
+        snprintf( included_by_path, inc_len, "%s/%s", cwd, included_by_file );
+      }
+
+
+      char* included_by_suffix = strrchr(included_by_path, '/'); // returns NULL if separator not found
+      if (!included_by_suffix)
+      {
+        fprintf(stderr, "Warning: included-by file is not a path: %s\n", included_by_path);
+      }
+      else
+      {
+        int pre_len = included_by_suffix - included_by_path;
+        int abs_len = pre_len + strlen(trimmed) + 2; // +1 separator, +1 terminator
+        abs_path = (char*)malloc(abs_len*sizeof(char));
+        abs_path[0] = 0;
+        strncat( abs_path, included_by_path, pre_len );
+        strncat( abs_path, "/", 1 );
+        strncat( abs_path, trimmed, strlen(trimmed) );
+        
+        if (0 == stat(abs_path, &st))
+        {
+          free(included_by_path);
+          free(trimmed); // safe to free because we copied trimmed into abs_path
+          break;
+        }
+        else
+        {
+          free(included_by_path);
+          free(abs_path); // remove buffer created above
+        }
+      }
+    }
+    
+    // 3. check if file in in cwd
+    if (0 == stat(trimmed, &st))
+    {
+      char cwd[CWD_BUFSIZE];
+      getcwd(cwd, sizeof(cwd));
+      int abs_len = strlen(cwd) + strlen(trimmed) + 2; // +1 separator, +1 terminator
+      abs_path = (char*)malloc(abs_len*sizeof(char));
+      snprintf( abs_path, abs_len, "%s/%s", cwd, trimmed );
+      free(trimmed); // safe to free because we copied trimmed
+      break; // goto end
     }
 
-  }
-  else
-  {
-    PDEBUG2(fprintf(stderr, "file is present\n"));
-  }
+    // 4. check if file is in absolute path
+    const char* abs_path_from_includes = find_in_include_path(trimmed, import_dirs, n_import_dirs);
+    if (0 != abs_path_from_includes)
+    {
+      free(trimmed); // safe to free because find_in_include_path copied trimmed
+      abs_path = abs_path_from_includes;
+      break; // goto end
+    }
 
-  PDEBUG2(fprintf(stderr,"\n"));
+    // warn that file does not exist
+    fprintf(stderr, "Warning: File not found: '%s'; included from '%s'\n", trimmed, included_by_file);
+      
+  } while(0);
 
-  //fprintf(stderr,"LineNum=%d, MapFile=%s\n", LineNum, included_by);
-  // TODO: strip filename at the end
-  // TODO: prepend cwd
-  // TODO: store with queue request
+  PDEBUG2(fprintf(stderr, "abs_path=%s\n\n",abs_path));
 
   // check if already requested
   ImportRequest* r = import_requests;
   for (; r; r=r->next)
   { 
-    if (0 == strcmp(trimmed, r->filename))
+    if (0 == strcmp(abs_path, r->filename))
     { return; }  // skip files already requested
 
-    if (! r->next) break; // advance pointer only until last valid element
+    if (! r->next) break; // don't advance pointer beyond last element
   }
   
   // postcondition: r now points to the last item in the queue
@@ -177,7 +246,7 @@ void DeferInput(char* filename)
   // create new struct for storing filename and 'visited' flag
   ImportRequest* new = (ImportRequest*)malloc(sizeof(ImportRequest));
   new->visited = 0;
-  new->filename = trimmed;
+  new->filename = abs_path;
   new->next = 0;
 
   
@@ -240,10 +309,10 @@ char** absolutify_include_paths(DefTableKeyList includeDir, int* ndirs)
   for (DefTableKeyList list= includeDir; list; list= TailDefTableKeyList(list), i++)
   {
     include_path = StringTable(GetClpValue(HeadDefTableKeyList(list), 0));
-    abs_len = cwd_len + strlen(include_path) + 2;   // +1 separator, +1 terminator
-    abs_path = (char*)malloc(abs_len*sizeof(char)); // allocate ith buffer
+    abs_len = cwd_len + strlen(include_path) + 2;            // +1 separator, +1 terminator
+    abs_path = (char*)malloc(abs_len*sizeof(char));          // allocate ith buffer
     snprintf(abs_path, abs_len, "%s/%s", cwd, include_path); // concat and write to buffer
-    idirs[i] = abs_path;                            // link buffer to array
+    idirs[i] = abs_path;                                     // link buffer to array
   }
   return idirs;
 }
@@ -281,55 +350,7 @@ const char* find_in_include_path(const char* suf_path, char** idirs, int ndirs)
   return 0;  
 }
 
-
-int try_open(const char *path, int oflags)
-{
-  int descr;
-  descr = open (path, oflags);
-  if (descr >= 0) return descr;
-
-  int path_len = strlen(path);
-
-  char cwd[1024]; // limited by os
-  //chdir("/path/to/change/directory/to");
-  getcwd(cwd, sizeof(cwd));
-  PDEBUG(printf("Current working dir: %s\n", cwd));
-
-
-  // try to open pathname relative to include directories
-  char* pre_path, *full_path;
-  int prefix_len, full_len;
-  for (DefTableKeyList list=IncludeDir; list; list=TailDefTableKeyList(list))
-  {
-    PDEBUG(printf("0\n"));
-    pre_path = StringTable(GetClpValue(HeadDefTableKeyList(list), 0));
-    prefix_len = strlen(pre_path);
-    full_len = prefix_len + path_len + 2;
-    full_path = (char*)malloc(full_len*sizeof(char)); // add separator and terminator
-    int byteswritten = snprintf(full_path, full_len, "%s/%s", pre_path, path);
-    if (byteswritten + 1 != full_len)
-    { fprintf(stderr, "Failed to allocate path %s/%s\n", pre_path, path);
-      free(full_path);
-      continue;
-    }
-    PDEBUG(printf(">1%s<\n", full_path));
-    descr = open (full_path, oflags);
-    PDEBUG(printf(">2%s<%d\n", full_path, descr));
-    //free(full_path);
-    PDEBUG(printf(">3%s<%d\n", full_path, descr));
-    if (descr >= 0)
-    { PDEBUG(printf("3x\n"));
-     return descr;
-    }
-    PDEBUG(printf("4\n"));
-  }
-  PDEBUG(printf("5\n"));
-  //return 0; // default to stdin
-  return -1;
-}
-
-/** override empty default implementation.
- * Load */
+/** override empty default implementation for auxEOF */
 #if defined(__cplusplus) || defined(__STDC__)
 char *auxEOF(char *start, int length)
 #else
@@ -341,7 +362,7 @@ char *auxEOF(start, length) char *start; int length;
   if (name == 0) return start;
 
   int descr;
-  descr = try_open (name, 0);
+  descr = open (name, 0);
   if (descr < 0)
   {
     fprintf(stderr, "Failed to open file '%s'\n", name);

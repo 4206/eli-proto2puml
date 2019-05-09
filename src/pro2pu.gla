@@ -1,3 +1,6 @@
+/* special comments */
+/* $[/][/][:] (auxEOL_buffered) */
+
 /* block and line comments */
 C_COMMENT
 $[/][/] (auxEOL)

@@ -1,0 +1,78 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+Ropes are "rich" strings.
+In loving memory of the obsolete OCaml string library.
+
+~O~<ropes.head~>==~{
+#include "ImportDefer.h"
+
+~}
+
+~O~<ropes.h~>==~{
+#ifndef ROPES_H
+#define ROPES_H
+
+/* count occurrences of a separator within a string */
+extern int cntchr(const char s[], const char sep);
+
+/* return nonzero on success (aka. bool) */
+extern int startswith(const char* str, const char* prefix);
+
+/* return nonzero on success (aka. bool) */
+extern int endswith(const char* str, const char* suffix);
+
+/* ATTN: parameter segs must have capacity allocated to contain all segments from segs */
+extern char* concat_n(char* buf, char** segs, char* sep, int nsegs);
+
+#endif // ROPES_H
+
+~}
+
+~O~<ropes.c~>==~{
+#include "ropes.h"
+#include <string.h>
+
+/* count occurrences of a separator within a string */
+int cntchr(const char s[], const char sep)
+{
+  int /*size_t*/ i = 0;
+  for (i=0; s[i]; s[i]==sep ? i++ : *s++);
+  return i;
+}
+
+/* return bool */
+int startswith(const char* str, const char* prefix)
+{
+  int pre_len = strlen(prefix);
+//fprintf(stderr,"startswith(%s,%s) == %d\n",str,prefix,strncmp(str, prefix, pre_len));
+  return 0 == strncmp(str, prefix, pre_len);
+}
+
+/* return bool */
+int endswith(const char* str, const char* suffix)
+{
+  int suf_len = strlen(suffix);
+  if (suf_len > strlen(str)) return 0; // return false
+//fprintf(stderr,"endswith(%s,%s) == %d via %s\n",str,suffix,strncmp(str-suf_len-1, suffix, suf_len),str-suf_len-1);
+  return 0 == strncmp(str-suf_len-1, suffix, suf_len);
+}
+
+/* res must have capacity allocated to contain all segments from segs */
+char* concat_n(char* buf, char** segs, char* sep, int nsegs)
+{
+  buf[0] = 0;
+  int i;
+  for (i=0;i<nsegs;i++)
+  {
+    strcat(buf, segs[i]);
+    strcat(buf, sep);      // prefix can always end with a dot
+    //if (i<nsegs-1) { strcat(buf, sep); }
+  }
+//fprintf(stderr,"%d: %s\n", i, buf);
+
+  return buf;
+}
+
+~}
