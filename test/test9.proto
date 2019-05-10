@@ -1,0 +1,41 @@
+syntax = "proto3";
+// test for auxEOL_buffered (just happens to reuse the structure of test8)
+
+package Handshake;
+
+
+message Body {
+  string not_used_fist_definition = 1;
+}
+
+
+message Response {
+  string header = 1;
+  Body body = 2;
+
+  message Body {
+    int32 response_type = 1;
+    repeated string item = 2;
+    int32 signature = 3; //# 'refer to A
+
+    message Body {
+      string not_used_nested_definition = 1;
+    }
+  }
+}
+
+message Request {
+  string header = 1; //# 'refer to BCDEFGH
+  Body body = 2;
+
+  message Body {
+    int32 request_type = 1;
+    repeated string item = 2; //#A--B
+  }
+}
+
+/*
+message Body { // warn about this re-definition: will re-open scope in puml
+  string not_used_last_definition = 1;
+}
+*/

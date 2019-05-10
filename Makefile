@@ -56,6 +56,8 @@ test7: test7.svg
 
 test8: test8.svg
 
+test9: test9.puml
+
 INDEX.proto:
 	echo 'syntax = "proto3";' > $(TRG_DIR)/INDEX.proto
 	find test-interfaces-sorted -name "*.proto" | sed 's/^\(.*\)/import "\1";/' >> $(TRG_DIR)/INDEX.proto

@@ -1,0 +1,150 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+Render Coordinates to String
+
+~O~<auxEOL_buffered.head~>==~{
+#include "auxEOL_buffered.h"
+
+~}
+
+~O~<auxEOL_buffered.h~>==~{
+#ifndef AUX_EOL_BUFFERED_H
+#define AUX_EOL_BUFFERED_H
+
+/** use this in .gla comment definitions, to gather up comments for later processing */
+extern char* auxEOL_buffered(char *start, int length);
+
+/** read the accumulated buffer */
+extern char* get_auxEOL_buffer();
+
+#endif // AUX_EOL_BUFFERED_H
+
+~}
+
+~O~<auxEOL_buffered.c~>==~{
+/* Copyright 1989, The Regents of the University of Colorado */
+
+/* This file is part of the Eli Module Library.
+
+The Eli Module Library is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Library General Public License for more details.
+
+You should have received a copy of the GNU Library General Public
+License along with the Eli Module Library; see the file COPYING.LIB.
+If not, write to the Free Software Foundation, Inc., 59 Temple Place -
+Suite 330, Boston, MA 02111-1307, USA.  */
+
+/* As a special exception, when this file is copied by Eli into the
+   directory resulting from a :source derivation, you may use that
+   created file as a part of that directory without restriction. */
+
+#include "eliproto.h"
+#include "err.h"
+#include "gla.h"
+#include "source.h"
+#include "ScanProc.h"
+
+#include <string.h>  // strncat
+
+typedef struct StringBuffer {
+  const char* start;
+  int len;
+  struct StringBuffer* next;
+  struct StringBuffer* prev;
+} StringBuffer;
+
+StringBuffer* auxEOL_buffer = 0; // end of list sentinel is 0
+
+void cons_auxEOL_buffer(const char* str, int len)
+{
+  StringBuffer* new = (StringBuffer*)malloc(sizeof(StringBuffer));
+  new->start = str;
+  new->len   = len;
+//fprintf(stderr, "CONS[%.20s||%d]\n",str,len);  
+  if (auxEOL_buffer != 0)
+  { auxEOL_buffer->next = new; }
+  
+  new->prev = auxEOL_buffer;
+  new->next = 0; // set sentinel
+
+  auxEOL_buffer = new; // prepend new items
+}
+
+/*
+**  Scan to end of line, handle bookeeping.
+**  Returns pointer to first character beyond newline.
+*/
+
+char *
+#ifdef PROTO_OK
+auxEOL_buffered(char *start, int length)
+#else
+auxEOL_buffered(start, length)
+char *start; int length;
+#endif
+{ register char c;
+  register char *p = start + length; /* first char not yet processed */
+
+  int len_0 = length;
+
+  if (*p == '\0') return p;
+
+  while((c = *p++) != '\n' && c != '\r') ;
+
+  if (c == '\r' && *p == '\n') p++;
+
+  cons_auxEOL_buffer(start+len_0, p-start-len_0);
+
+  if (*p == '\0') {
+    int length = p - start;
+    start = TokenStart = auxNUL(start, length);
+    p = start + length;
+  }
+
+  LineNum++;
+  StartLine = p - 1;
+
+  return p;
+}
+
+
+char* get_auxEOL_buffer()
+{
+  if (auxEOL_buffer == 0) { return ""; }
+//fprintf(stderr,"1\n");
+  // count size of buffer to allocate
+  int buf_len = 0;
+  StringBuffer* p; // pre: auxEOL_buffer points to tail, iterate with prev
+  for ( p= auxEOL_buffer; p->prev; p= p->prev )
+  {
+    buf_len += p->len;   // newlines already contained due to auxEOL_buffered definition above
+  }
+  buf_len += p->len + 1; // +1 for term
+  // post: p points to start, iterate with next
+  //char* res = (char*)malloc(buf_len*sizeof(char));
+  char* res = (char*)malloc(buf_len*sizeof(char));
+//fprintf(stderr,"10 allocated %d\n", buf_len);
+  res[0] = 0; // set initial string terminator
+  int i = 0;
+  for ( ; p; p= p->next )
+  {
+//fprintf(stderr,"NEXT %d\n", &res);
+//fprintf(stderr,"pre: [%s]\n", res);
+//fprintf(stderr,"LA:[%s]\n", p->start);
+//fprintf(stderr,"add: %.20s at len=%d\n", p->start, p->len);
+    strncpy( res+i, p->start, p->len );
+    i+=p->len;
+//fprintf(stderr, "POST\n");
+    //strncat( res, p->start, p->len );
+    // strncat( res, "\n", 1 ); // don't insert extra newlines
+  }
+//fprintf(stderr,"20\n");
+  res[buf_len-1] = 0;
+  return res;
+}
+
+~}

@@ -6,8 +6,8 @@ Use import statements to enqueue files for appending at the
 end of the input stream.
 Remembers visited files and does not include them again.
 
-Note: provides an overriding implementation of auxEOF,
-see auxEOF in: http://eli-project.sourceforge.net/elionline/lex_1.html#SEC8
+auxEOF is overridden by this package,
+as recommended in: http://eli-project.sourceforge.net/elionline/lex_1.html#SEC8
 
 ~O~<ImportDefer.specs~>==~{
 ropes.fw
@@ -216,7 +216,7 @@ void DeferInput(char* filename)
     }
 
     // 4. check if file is in absolute path
-    const char* abs_path_from_includes = find_in_include_path(trimmed, import_dirs, n_import_dirs);
+    char* abs_path_from_includes = find_in_include_path(trimmed, import_dirs, n_import_dirs);
     if (0 != abs_path_from_includes)
     {
       free(trimmed); // safe to free because find_in_include_path copied trimmed

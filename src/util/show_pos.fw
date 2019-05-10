@@ -4,6 +4,11 @@
 
 Render Coordinates to String
 
+~O~<show_pos.specs~>==~{
+ensure_idn.fw
+ReportF.fw
+~}
+
 ~O~<show_pos.pdl~>==~{
 Pos: CoordPtr;
 ~}
@@ -34,6 +39,9 @@ extern int cmp_coord( CoordPtr a, CoordPtr b );
 #include "pdl_gen.h"  /* GetPos */
 #include "CoordMap.h" /* MapLine */
 #include "source.h"   /* SRCFILE */  
+
+#include "ensure_idn.h"
+#include "ReportF.h"
 
 const char* show_pos( DefTableKey key )
 {
@@ -73,7 +81,7 @@ const char* show_coord( CoordPtr coord )
     nwritten = snprintf(str, sz, "%d:%d-%d:%d", MapLine(LineOf(*coord)), ColOf(*coord), MapLine(RLineOf(*coord)), RColOf(*coord));
 #endif
   if(nwritten < 0)
-  { Report(ERROR,0,"failed to show_coord");
+  { ReportF(ERROR,0,"failed to show_coord");
     return "??:??";
   }
   return (const char*)str;

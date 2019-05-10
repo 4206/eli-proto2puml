@@ -31,3 +31,5 @@ $/Adt/List.gnrc+instance=DefTableKey +referto=deftbl :inst /* DefTableKeyList fo
 lookup_class_in_typedict.fw
 
 util/show_pos.fw
+
+auxEOL_buffered.fw /* feature for Lars: collect verbatim PUML from comments starting with "//>" */

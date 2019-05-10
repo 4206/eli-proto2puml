@@ -51,7 +51,9 @@ CLASS SYMBOL ROOTCLASS COMPUTE
   PTGOut(
     PTGPUML(
       /*PTGNlSeq( TAIL.puml_ptg_chn, PTGNlSeq( TAIL.puml_relations_ptg_chn, TAIL.puml_relations_ptg_chn2 ) )*/
-      PTGNlSeq( TAIL.puml_ptg_chn, TAIL.puml_relations_ptg_chn )
+      PTGNlSeq( TAIL.puml_ptg_chn, 
+      PTGNlSeq( TAIL.puml_relations_ptg_chn,
+                PTGAsIs(get_auxEOL_buffer()) ))
   ));
 
   /*PTGOut( CONSTITUENTS contributesField.field_relation_ptg WITH (PTGNode,PTGNlSeq,IDENTICAL,PTGNull) );*/
