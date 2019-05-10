@@ -27,16 +27,11 @@ RelationSubclass: $1 " +-- " $2
 /* Newline sequence with optional arguments */
 NlSeq: $1 {[IndentNewLine]} $2
 
-/*DotSeq: $1 {"."} $2*/
-
 /* inner dot or $ shall be omitted if $1 or $3 are PTGNULL */
 Seq3 : $1 {$2} $3
 
 PUML: "@startuml" [IndentNewLine] $ [IndentNewLine] "@enduml" [IndentNewLine]
 
 oneofVariant: [PtgOutId $1 int ] " variant"
-
-/*  ORDER(PTGOut(PTGKRDebug(PTGAsIs("KResetQualifiedName"),NAME_PTG,IDN) */
-/*KRDebug: "KResetQualifiedName: " $1 " <- " [PtgOutId $2 int] [IndentNewLine]*/
 
 SourceFile: "'source file: " [CPtgOutstr $1 string] /*   const char* included_by = MapFile(LineNum); */

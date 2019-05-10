@@ -29,3 +29,5 @@ util/ReportF.fw
 $/Adt/List.gnrc+instance=DefTableKey +referto=deftbl :inst /* DefTableKeyList for TypeDef & TypeUse */
 
 lookup_class_in_typedict.fw
+
+util/show_pos.fw

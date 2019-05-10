@@ -1,0 +1,102 @@
+@=~
+~p maximum_input_line_length = infinity
+~p maximum_output_line_length = infinity
+
+Render Coordinates to String
+
+~O~<show_pos.pdl~>==~{
+Pos: CoordPtr;
+~}
+
+~O~<show_pos.h~>==~{
+#ifndef SHOW_POS_H
+#define SHOW_POS_H
+
+#include "deftbl.h"
+#include "err.h"
+
+// ELI's naming sucks here: there is Coord and CoordPtr. A CoordPtr is a Position.
+extern const char* show_pos( DefTableKey key );
+extern const char* show_coord( CoordPtr coord );
+
+extern const char* coord_tostr( CoordPtr coord ); // rust-like naming
+
+// compare positions by start offset; end offset and overlap situations are ignored 
+extern int cmp_pos( DefTableKey a, DefTableKey b );
+extern int cmp_coord( CoordPtr a, CoordPtr b );
+
+#endif // SHOW_POS_H
+
+~}
+
+~O~<show_pos.c~>==~{
+#include "show_pos.h"
+#include "pdl_gen.h"  /* GetPos */
+#include "CoordMap.h" /* MapLine */
+#include "source.h"   /* SRCFILE */  
+
+const char* show_pos( DefTableKey key )
+{
+  return show_coord( GetPos( key, NoPosition ));
+}
+
+inline const char* coord_tostr( CoordPtr coord )
+{
+  return show_coord( coord );
+}
+
+//modeled after map_position in messaging.fw
+const char* show_coord( CoordPtr coord )
+{ 
+  char* str;
+  size_t sz;
+  int nwritten;
+  // determine if source file needs to be reported
+  const char* filename = MapFile(LineOf(*coord));
+  const size_t f_sz = ensure_idn(filename) == ensure_idn(SRCFILE) ? 0 : (strlen(filename)+3); // filename is other than the current input file, 3 is length of "@()"
+#ifndef RIGHTCOORD
+  if( !coord ) return "0:0";
+  sz = f_sz + (sizeof(int) == 4 ? 22 : 2*8*sizeof(int)+1+1);
+  str = (char*)malloc(sz); 
+  if( f_sz > 0 )
+    nwritten = snprintf(str, sz, "%d:%d@(%s)", MapLine(LineOf(*coord)), ColOf(*coord),filename);
+  else
+    nwritten = snprintf(str, sz, "%d:%d", MapLine(LineOf(*coord)), ColOf(*coord));
+//printf("hold\n");
+#else
+  if( !coord ) return "0:0-0:0";
+  sz = f_sz + (sizeof(int) == 4 ? 44 : 4*8*sizeof(int)+3+1);
+  str = (char*)malloc(sz);
+  if( f_sz > 0 )
+    nwritten = snprintf(str, sz, "%d:%d-%d:%d@(%s)", MapLine(LineOf(*coord)), ColOf(*coord), MapLine(RLineOf(*coord)), RColOf(*coord),filename);
+  else
+    nwritten = snprintf(str, sz, "%d:%d-%d:%d", MapLine(LineOf(*coord)), ColOf(*coord), MapLine(RLineOf(*coord)), RColOf(*coord));
+#endif
+  if(nwritten < 0)
+  { Report(ERROR,0,"failed to show_coord");
+    return "??:??";
+  }
+  return (const char*)str;
+}
+
+int cmp_pos( DefTableKey a, DefTableKey b )
+{
+  return cmp_coord( GetPos(a,NoPosition), GetPos(b,NoPosition) );
+}
+
+int cmp_coord( CoordPtr a, CoordPtr b )
+{
+  if( a->line < b->line ) return -1;
+  if( a->line > b->line ) return  1;
+  // a->line == b->line
+  if( a->col  < b->col  ) return -1;
+  if( a->col  > b->col  ) return  1;
+
+  return 0;
+}
+~}
+
+~O~<show_pos.head~>==~{
+#include "show_pos.h"
+
+~}
