@@ -83,7 +83,7 @@ int n_import_dirs;
 
 // forward declarations
 char** absolutify_include_paths(DefTableKeyList includeDir, int* ndirs);
-const char* find_in_include_path(const char* filename, char** idirs, int ndirs);
+char* find_in_include_path(const char* filename, char** idirs, int ndirs);
 
 void init_import_requests()
 {
@@ -317,7 +317,7 @@ char** absolutify_include_paths(DefTableKeyList includeDir, int* ndirs)
   return idirs;
 }
 
-const char* find_in_include_path(const char* suf_path, char** idirs, int ndirs)
+char* find_in_include_path(const char* suf_path, char** idirs, int ndirs)
 {
   int suf_len = strlen(suf_path);
   char* pre_path;

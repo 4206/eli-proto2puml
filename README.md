@@ -2,7 +2,7 @@
 
 A parser for protobuf files and compiler to plantuml files.
 Supports protobuf syntax 2 and 3.
-Generates simple class diagrams which can be converted to images with plantuml.
+Generate simple class diagrams which can be converted to images with plantuml.
 
 Importing of files is supported (must be in cwd). Cyclic dependencies are resolved.
 
@@ -14,21 +14,26 @@ Importing of files is supported (must be in cwd). Cyclic dependencies are resolv
 
 ## Prerequisites
 
-The compiler is built with ELI (https://eli-project.sf.net), a compiler generator toolkit.
-ELI must be built from source. If Tcl/Tk development libraries are available during compilation, parser debugging with ```make mon``` will work.
+The compiler is built from ELI-specification. ELI is a compiler generator toolkit, not just a parser generator.
 
-Adjust the Makefile, if you install ELI someplace other than ```/opt/eli/```.
+ELI generates C-code from the specification, which is then compiled to binary with GCC.
+ELI is available at (https://eli-project.sf.net), and must be built from source.
+If you want to debug the C-code generation process, it is helpful to have Tcl/Tk development libraries installed before building ELI, so that the target ```make mon``` will work.
+
+Please adjust the Makefile after building ELI, and set the path to the ELI executable binary.
 
 ## Building
 
 Run ```make exe``` to build the ```target/pro2pu``` executable.
 
-Run ```make source``` to generate C source code for compilation on different OS'es, e.g. MacOS, Windows. Some adjustments may be needed.
+Run ```make source``` to generate C source code and a Makefile for export and compilation on e.g. MacOS, Windows. Some adjustments to the C sources may be needed under Windows
 
 ### Errors during build
 
-If building fails with message ```Cannot connect to Odin server.```,
+If ELI fails with message ```Cannot connect to Odin server.```,
 then run ```eli -r``` or ```make connect_to_odin```.
+
+# Appendix
 
 ## Errors in the specs
 
