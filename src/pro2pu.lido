@@ -319,8 +319,15 @@ CLASS SYMBOL contributesRelation: subclass_relation_ptg: PTGNode SYNT;
 CLASS SYMBOL contributesRelation COMPUTE
   SYNT.puml_relations_ptg_chn =
     PTGNlSeq(TAIL.puml_relations_ptg_chn,
-    PTGNlSeq(THIS.field_relation_ptg,
-             THIS.subclass_relation_ptg));
+    PTGNlSeq( IF( GetClpValue( ShowUsageRelation, 1 )
+                , THIS.field_relation_ptg
+                , PTGNULL
+                )
+            , IF( GetClpValue( ShowInnerRelation, 1 )
+                , THIS.subclass_relation_ptg
+                , PTGNULL
+                )
+            ));
   
   %// default contributions
   SYNT.field_relation_ptg    = PTGNULL; %// PTGAsIs("none");
