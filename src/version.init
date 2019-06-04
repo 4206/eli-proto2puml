@@ -1,0 +1,5 @@
+if ( ShowVersion )
+{
+  printf("pro2pu 1.1\n");
+  exit(0); 
+}

@@ -46,19 +46,14 @@ CLASS SYMBOL ROOTCLASS COMPUTE
   CHAINSTART HEAD.puml_ptg_chn = PTGNULL;
   CHAINSTART HEAD.puml_fields_ptg_chn = PTGNULL;
   CHAINSTART HEAD.puml_relations_ptg_chn = PTGNULL;
-  /*CHAINSTART HEAD.puml_relations_ptg_chn2 = PTGNULL;*/
+
   %// print collected uml lines
   PTGOut(
     PTGPUML(
-      /*PTGNlSeq( TAIL.puml_ptg_chn, PTGNlSeq( TAIL.puml_relations_ptg_chn, TAIL.puml_relations_ptg_chn2 ) )*/
       PTGNlSeq( TAIL.puml_ptg_chn, 
       PTGNlSeq( TAIL.puml_relations_ptg_chn,
                 PTGAsIs(get_auxEOL_buffer()) ))
   ));
-
-  /*PTGOut( CONSTITUENTS contributesField.field_relation_ptg WITH (PTGNode,PTGNlSeq,IDENTICAL,PTGNull) );*/
-  /*PTGOut( CONSTITUENTS contributesSubclass.subclass_relation_ptg WITH (PTGNode,PTGNlSeq,IDENTICAL,PTGNull) );*/
-
 
   %// collect map of <fully qualified type, key>/
   CHAINSTART HEAD.custom_types_env_chn = NewEnv();
@@ -176,7 +171,7 @@ SYMBOL Extend COMPUTE
   HEAD.qualified_classname_sym_chn = THIS.qualified_name_sym;          %// pass down
   SYNT.qualified_classname_sym_chn = THIS.qualified_classname_sym_chn; %// bridge
 
-  %// don't add another link for subclassing relation
+  %// don't add another link for subclassing relation in Extend
   SYNT.subclass_relation_ptg = PTGNULL;
      /*IF( INCLUDING (qualifiedName.yes, Extend.yes, ROOTCLASS.no)
       *  , PTGRelationSubclass(INCLUDING (qualifiedName.qualified_name_ptg, Extend.qualified_name_ptg, ROOTCLASS.ptgnull), THIS.qualified_name_ptg)

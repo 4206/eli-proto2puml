@@ -33,3 +33,5 @@ lookup_class_in_typedict.fw
 util/show_pos.fw
 
 auxEOL_buffered.fw /* feature for Lars: collect verbatim PUML from comments starting with "//>" */
+
+version.init /* print version info if requested */

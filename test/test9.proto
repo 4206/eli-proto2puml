@@ -5,7 +5,7 @@ package Handshake;
 
 
 message Body {
-  string not_used_fist_definition = 1;
+  string not_used_first_definition = 1;
 }
 
 
@@ -30,7 +30,7 @@ message Request {
 
   message Body {
     int32 request_type = 1;
-    repeated string item = 2; //#A--B
+    repeated string item = 2; //#Handshake.Response$Body$Body..Handshake.Body : (mutually useless)
   }
 }
 

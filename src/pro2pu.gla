@@ -1,4 +1,4 @@
-/* special comments */
+/* comments that will be passed verbatim to the generated puml */
 $[/][/][#] (auxEOL_buffered)
 
 /* block and line comments */
